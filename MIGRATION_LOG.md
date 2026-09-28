@@ -6,6 +6,18 @@ Tracking decisions and progress for the Python -> Mojo port.
 Historical entries below are chronological; later dated sections supersede
 earlier TODOs when they conflict.
 
+## 2026-09-28 — Repository rename to GoliathAlign
+
+The local checkout directory is **GoliathAlign**. `GOLIATH_ALIGN_*` and `/opt/goliath-align` are canonical. `MOJO_ALIGN_*` and `/opt/mojo-align` remain one-cycle aliases. The `methylGrapher` CLI and algorithm package directories are unchanged.
+
+The Git remote is still `https://github.com/Goliath-Research/mojo-align.git`. Rename it on GitHub from a machine that has `gh` logged in:
+
+```bash
+gh repo rename GoliathAlign --repo Goliath-Research/mojo-align
+```
+
+GitHub then redirects the old URL. Point `origin` at `https://github.com/Goliath-Research/GoliathAlign.git` after that rename.
+
 ---
 
 ## 2026-08-09 — No app-level CUDA Runtime on native Mojo path

@@ -1,5 +1,7 @@
 # Giraffe mapper benchmarks (Mojo GBZ vs vg)
 
+> **Repository:** GoliathAlign (formerly `mojo-align`). `GOLIATH_ALIGN_*` is the environment family. `MOJO_ALIGN_*` and `/opt/mojo-align` remain one-cycle aliases of `GOLIATH_ALIGN_*` and `/opt/goliath-align`.
+
 Science contract: dual-graph GAF + named-coordinates → Mojo MethylCall.
 See [`GIRAFFE_SPEC.md`](GIRAFFE_SPEC.md).
 

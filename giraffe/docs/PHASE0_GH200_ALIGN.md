@@ -1,5 +1,7 @@
 # Phase 0 — GH200 dual-graph Align spike (go/no-go)
 
+> **Repository:** GoliathAlign (formerly `mojo-align`). `GOLIATH_ALIGN_*` is the environment family. `MOJO_ALIGN_*` and `/opt/mojo-align` remain one-cycle aliases of `GOLIATH_ALIGN_*` and `/opt/goliath-align`.
+
 **Host:** NVIDIA GH200 (≈96 GiB HBM), aarch64 Grace.  
 **Indexes:** `/work/genomes/pangenome/GRCh38/d9-bs/1.70` C2T/G2A (methylGrapher PrepareGenome 1.70).  
 **Date:** 2026-08-06.

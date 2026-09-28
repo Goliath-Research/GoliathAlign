@@ -1,5 +1,7 @@
 # MethylCall benchmark (20k-line DS20M GAF subset)
 
+> **Repository:** GoliathAlign (formerly `mojo-align`). `GOLIATH_ALIGN_*` is the environment family. `MOJO_ALIGN_*` and `/opt/mojo-align` remain one-cycle aliases of `GOLIATH_ALIGN_*` and `/opt/goliath-align`.
+
 Index: `hprc-d9-bs.wl.gfa` (~43 GB, 60 118 570 segments). Host: Grace/ARM64 64K pages.
 
 Engine forces `gfa_worker_num=1`. Stock 0.2.0 also uses one GFA worker at `-t` 8/16; the dual-GFA cliff is `-t > 20`.

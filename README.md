@@ -1,9 +1,22 @@
-# mojo-align
+# GoliathAlign
 
-Open-source Mojo align monorepo for WGBS SamplePrep (MIT; linear path follows
-**bwa-meth**, `methylgrapher/` follows **methylGrapher**). Git history includes
-the former tree that was named `methylGrapher-mojo` (that repository no longer
-exists). Unified CLI remains `bin/methylGrapher`.
+**GoliathApp** is the platform. **GoliathOmics** is the genomics product. **GoliathAlign** (formerly mojo-align) aligns reads. **MethylExtractor** calls methylation from linear BAM files. **GoliathWeb** is the public hub.
+
+Index: [../GoliathApp/docs/workspace-index.md](../GoliathApp/docs/workspace-index.md).
+
+Multiplatform Mojo aligner (MIT). It runs on Linux x86-64 and ARM64, on CPU and on NVIDIA CUDA or AMD HIP through Mojo `DeviceContext`. TPU and AWS Trainium are not implemented. The first product consumer is GoliathOmics whole-genome bisulfite sequencing. The linear path follows **bwa-meth**. `methylgrapher/` follows **methylGrapher**. Git history includes the former tree named `methylGrapher-mojo` (that repository no longer exists). This repository was named `mojo-align` until 2026-09-28. The local directory is GoliathAlign. The Git remote stays `Goliath-Research/mojo-align` until `gh repo rename GoliathAlign` is run on a logged-in machine; see [`MIGRATION_LOG.md`](MIGRATION_LOG.md).
+
+Unified CLI remains `bin/methylGrapher`. Mojo is the language, not the product name.
+
+## One-cycle aliases
+
+| Current | Still accepted |
+|---------|----------------|
+| `GOLIATH_ALIGN_*` | `MOJO_ALIGN_*` (deprecation warning) |
+| `/opt/goliath-align` | `/opt/mojo-align` (symlink in the image) |
+| Sibling checkout `../GoliathAlign` | `../mojo-align` |
+
+Image repository and tags stay `goliath/methylgrapher:*-mojo-*`.
 
 ## Packages
 
@@ -17,11 +30,9 @@ exists). Unified CLI remains `bin/methylGrapher`.
 
 The whole monorepo is MIT open source. Linear mapping follows [bwa-meth](https://github.com/brentp/bwa-meth); `methylgrapher/` is a methylGrapher derivative.
 
-## Align paths + sample layout
+## Align paths
 
-Canonical align IDs (folder names under each sample). **Before/after bakeoffs keep
-Clara and `vg` as first-class arms** — Mojo is preferred science, not a deletion
-of originals.
+Canonical align IDs are folder names under each sample. GoliathOmics creates those directories. This repository writes only the `-work_dir` it is given. Before/after bakeoffs keep Clara and `vg` as first-class arms. Mojo is the preferred science path.
 
 | ID | Runtime | Role |
 |----|---------|------|
@@ -31,7 +42,7 @@ of originals.
 | `align.pangenome.vg` / `align.pangenome_wgbs.vg` | `vg giraffe` (`cpu_vg`) | **Before** named-coordinate GAF oracle |
 | `align.pangenome_wgbs.mojo` | MojoGiraffe dual-graph | **After** preferred WGBS science |
 
-Optional extract staging (MethylPipeline compare harness; not written by this CLI):
+Optional extract staging (GoliathOmics compare harness; not written by this CLI):
 
 | ID | Tool | Role |
 |----|------|------|
@@ -50,11 +61,7 @@ Optional extract staging (MethylPipeline compare harness; not written by this CL
   extract.methyldackel/        # optional A/B
 ```
 
-Multiple align dirs may coexist for side-by-side parity and linear→pangenome
-comparisons. MethylPipeline owns creating these folders; tools write to the
-`-work_dir` they are given. Comparison reports land under
-`/work/samples/_comparisons/<stamp>/` (see MethylPipeline
-`docs/architecture/sample-prep-tooling.md`).
+Multiple align dirs may coexist for side-by-side parity and linear-to-pangenome comparisons. Comparison reports land under `/work/samples/_comparisons/<stamp>/`.
 
 ## Quick start
 
@@ -82,31 +89,26 @@ Mojo include paths (also set by `bin/methylGrapher`):
 
 ## Supported platforms
 
-The pixi environment supports Linux x86-64 (`linux-64`) and Linux ARM64
-(`linux-aarch64`) hosts. Host architecture is independent of the implemented
-compute backends: this repository provides CPU execution plus NVIDIA CUDA and
-AMD HIP accelerator paths through Mojo `DeviceContext`. TPU and AWS Trainium
-backends are not implemented.
+The pixi environment supports Linux x86-64 (`linux-64`) and Linux ARM64 (`linux-aarch64`) hosts. Host architecture is independent of the compute backends: CPU, NVIDIA CUDA, and AMD HIP. TPU and AWS Trainium backends are not implemented.
 
 ## Fleet image
 
 This repo does not build the worker image. GoliathOmics `Dockerfile.mojo` expects a flat `engine/` + `src/` tree. Assemble it, then build from the GoliathOmics checkout (Docker image, and a `.sif` when Apptainer is installed):
 
 ```bash
-bash scripts/stage_flat_image_tree.sh /tmp/mojo-flat
-export MOJO_ALIGN_ROOT=/tmp/mojo-flat   # or point at this repo; the build script stages it
+bash scripts/stage_flat_image_tree.sh /tmp/goliath-align-flat
+export GOLIATH_ALIGN_ROOT=/tmp/goliath-align-flat   # or point at this repo; the build script stages it
 # in the GoliathOmics repo:
-#   bash scripts/build_mojo_align_image.sh
-#   bash scripts/run_mojo_align_sif.sh /work/goliath/images/methylgrapher-1.70-mojo-cuda.sif -- Align ...
+#   bash scripts/build_goliath_align_image.sh
+#   bash scripts/run_goliath_align_sif.sh /work/goliath/images/methylgrapher-1.70-mojo-cuda.sif -- Align ...
 ```
 
-In-container paths are `/opt/mojo-align` + `methylGrapher` entrypoint.
+In-container paths are `/opt/goliath-align` (symlink `/opt/mojo-align`) and the `methylGrapher` entrypoint. `MOJO_ALIGN_ROOT` still works for one cycle.
 
 ## CI
 
-- **This repo (`mojo-align`)** is the only tree: [`ci/azure-pipelines.yml`](ci/azure-pipelines.yml)
-- Env family is `MOJO_ALIGN_*`.
+GitHub Actions is the CI for this repository (`.github/workflows/ci.yml`). Env family is `GOLIATH_ALIGN_*`.
 
 ## Migration notes
 
-See [`MIGRATION_LOG.md`](MIGRATION_LOG.md) for the Python→Mojo science cutover history.
+See [`MIGRATION_LOG.md`](MIGRATION_LOG.md) for the Python-to-Mojo science cutover and the 2026-09-28 repository rename.

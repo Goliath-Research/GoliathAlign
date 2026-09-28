@@ -1,5 +1,7 @@
 # MojoFq2bamMeth — portable linear WGBS Align
 
+> **Repository:** GoliathAlign (formerly `mojo-align`). `GOLIATH_ALIGN_*` is the environment family. `MOJO_ALIGN_*` and `/opt/mojo-align` remain one-cycle aliases of `GOLIATH_ALIGN_*` and `/opt/goliath-align`.
+
 Science contract for **linear** (non-pangenome) WGBS Align as a Clara
 Parabricks `fq2bam_meth` substitute on NVIDIA **and** AMD ROCm.
 

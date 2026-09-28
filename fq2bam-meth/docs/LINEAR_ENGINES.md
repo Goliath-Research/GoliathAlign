@@ -1,5 +1,7 @@
 # Linear GPU engines: fm vs parity vs speed
 
+> **Repository:** GoliathAlign (formerly `mojo-align`). `GOLIATH_ALIGN_*` is the environment family. `MOJO_ALIGN_*` and `/opt/mojo-align` remain one-cycle aliases of `GOLIATH_ALIGN_*` and `/opt/goliath-align`.
+
 Three Mojo GPU mappers share the orchestrator and SAM/BAM consumer path.
 
 | Engine | Env | Module | Index | Role |

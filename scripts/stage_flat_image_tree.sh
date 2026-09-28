@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Assemble a flat /opt/mojo-align-compatible tree from mojo-align packages.
+# Assemble a flat /opt/goliath-align-compatible tree from GoliathAlign packages.
+# /opt/mojo-align remains a one-cycle symlink inside the worker image.
 #
 # Usage:
 #   scripts/stage_flat_image_tree.sh [DEST]

@@ -1,38 +1,51 @@
-# MOJO_ALIGN_* env + Python sys.path (legacy METHYLGRAPHER_MOJO_* dual-read).
+# GOLIATH_ALIGN_* env + Python sys.path.
+# MOJO_ALIGN_* and METHYLGRAPHER_MOJO_* are one-cycle fallbacks.
 
 from std.collections import List
 from std.python import Python, PythonObject
 
 
+def _env_nonempty(os_mod: PythonObject, key: String) raises -> String:
+    var raw = String(os_mod.environ.get(key, ""))
+    return String(raw.strip())
+
+
 def getenv_align(suffix: String, default: String = "") raises -> String:
     var os_mod = Python.import_module("os")
-    var new_key = "MOJO_ALIGN_" + suffix
+    var canon_key = "GOLIATH_ALIGN_" + suffix
+    var mid_key = "MOJO_ALIGN_" + suffix
     var old_key = "METHYLGRAPHER_MOJO_" + suffix
-    var value = String(os_mod.environ.get(new_key, ""))
-    var stripped_value = String(value.strip())
-    value = stripped_value
+    var value = _env_nonempty(os_mod, canon_key)
     if value.byte_length() > 0:
         return value
-    var legacy = String(os_mod.environ.get(old_key, ""))
-    var stripped_legacy = String(legacy.strip())
-    legacy = stripped_legacy
+    var mid = _env_nonempty(os_mod, mid_key)
+    if mid.byte_length() > 0:
+        print("warning: ", mid_key, " is deprecated; use ", canon_key, flush=True)
+        return mid
+    var legacy = _env_nonempty(os_mod, old_key)
     if legacy.byte_length() > 0:
-        print("warning: ", old_key, " is deprecated; use ", new_key, flush=True)
+        print("warning: ", old_key, " is deprecated; use ", canon_key, flush=True)
         return legacy
     return default
 
 
 def install_prefix() raises -> String:
     var os_mod = Python.import_module("os")
+    if Bool(os_mod.path.isdir("/opt/goliath-align")):
+        return "/opt/goliath-align"
     if Bool(os_mod.path.isdir("/opt/mojo-align")):
+        print(
+            "warning: /opt/mojo-align is deprecated; use /opt/goliath-align",
+            flush=True,
+        )
         return "/opt/mojo-align"
     if Bool(os_mod.path.isdir("/opt/methylgrapher-mojo")):
         print(
-            "warning: /opt/methylgrapher-mojo is deprecated; use /opt/mojo-align",
+            "warning: /opt/methylgrapher-mojo is deprecated; use /opt/goliath-align",
             flush=True,
         )
         return "/opt/methylgrapher-mojo"
-    return "/opt/mojo-align"
+    return "/opt/goliath-align"
 
 
 def _insert_path(sys_mod: PythonObject, path: String) raises:
@@ -42,7 +55,7 @@ def _insert_path(sys_mod: PythonObject, path: String) raises:
 
 
 def ensure_python_path() raises:
-    """cwd, MOJO_ALIGN_ROOT, /opt/mojo-align — never a developer home path."""
+    """cwd, GOLIATH_ALIGN_ROOT, /opt/goliath-align — never a developer home path."""
     var os_mod = Python.import_module("os")
     var sys_mod = Python.import_module("sys")
     var cwd = String(os_mod.getcwd())
@@ -83,4 +96,4 @@ def giraffe_fixture_root() raises -> String:
     for p in cands:
         if Bool(os_mod.path.isdir(p)):
             return p
-    raise Error("giraffe_fixture not found under cwd or MOJO_ALIGN_ROOT")
+    raise Error("giraffe_fixture not found under cwd or GOLIATH_ALIGN_ROOT")

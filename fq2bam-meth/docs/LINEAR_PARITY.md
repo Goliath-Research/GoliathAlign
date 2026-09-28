@@ -1,5 +1,7 @@
 # Linear Align parity: `align.linear.parabricks` vs `align.linear.mojo`
 
+> **Repository:** GoliathAlign (formerly `mojo-align`). `GOLIATH_ALIGN_*` is the environment family. `MOJO_ALIGN_*` and `/opt/mojo-align` remain one-cycle aliases of `GOLIATH_ALIGN_*` and `/opt/goliath-align`.
+
 Prove concordance between Clara Parabricks `fq2bam_meth` and MojoFq2bamMeth
 on the same inputs, using the per-path sample layout.
 
