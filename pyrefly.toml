@@ -1,0 +1,41 @@
+# Type-check the Python helper layer. Mojo sources are not Python.
+# methylgrapher/python_reference/ is frozen upstream (see its README) and is excluded.
+project-includes = [
+  "conftest.py",
+  "gpu-common/python",
+  "gpu-common/tests",
+  "fq2bam-meth/python",
+  "fq2bam-meth/scripts",
+  "fq2bam-meth/tests",
+  "giraffe/python",
+  "giraffe/scripts",
+  "giraffe/tests",
+  "methylgrapher/engine",
+  "methylgrapher/scripts",
+  "methylgrapher/tests",
+  "numeric/python",
+  "numeric/tests",
+]
+
+project-excludes = [
+  "methylgrapher/python_reference/**",
+]
+
+# Same import roots as CI PYTHONPATH and conftest.py, plus numeric/.
+search-path = [
+  "methylgrapher",
+  "giraffe/scripts",
+  "giraffe/python",
+  "fq2bam-meth/python",
+  "fq2bam-meth/scripts",
+  "gpu-common/python",
+  "methylgrapher/scripts",
+  "numeric/python",
+]
+
+# Matches the Python version solved in pixi.lock (spec is >=3.11,<3.14).
+python-version = "3.13"
+python-platform = "linux"
+
+# Optional GPU stack. Production Giraffe does not import CuPy.
+ignore-missing-imports = ["cupy", "cupy.*"]

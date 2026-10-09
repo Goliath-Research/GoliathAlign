@@ -42,7 +42,7 @@ class _PigzTextHandle:
         self.close()
 
 
-def open_fastq_text(path: str) -> TextIO[str] | _PigzTextHandle:
+def open_fastq_text(path: str) -> TextIO | _PigzTextHandle:
     """Open FASTQ for Mojo ``readline`` loop (plain or .gz)."""
     low = path.lower()
     if not (low.endswith(".gz") or low.endswith(".gzip")):

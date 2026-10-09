@@ -544,6 +544,7 @@ def run_mojo_linear_map(
     samtools = shutil.which("samtools")
     map_path = out_sam
     view_proc: subprocess.Popen[str] | None = None
+    view_err = None
     fifo: Path | None = None
     native_bam = (
         out_bam is not None
@@ -653,10 +654,11 @@ def run_mojo_linear_map(
         view_err_txt = ""
         if view_proc is not None:
             vrc = view_proc.wait()
-            try:
-                view_err.close()
-            except Exception:
-                pass
+            if view_err is not None:
+                try:
+                    view_err.close()
+                except Exception:
+                    pass
             if vrc != 0:
                 handle.write(f"samtools view -u failed rc={vrc}\n")
                 raise RuntimeError(

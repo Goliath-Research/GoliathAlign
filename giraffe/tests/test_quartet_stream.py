@@ -20,7 +20,9 @@ def test_iter_fastq_batches_pairs(tmp_path: Path, monkeypatch) -> None:
     batches = list(_iter_fastq_batches(str(r1), str(r2)))
     assert [len(b) for b in batches] == [2, 2, 1]
     assert batches[0][0][0][0] == "r0"
-    assert batches[-1][0][1][1] == "TGCA"
+    last_r2 = batches[-1][0][1]
+    assert last_r2 is not None
+    assert last_r2[1] == "TGCA"
 
 
 def test_iter_fastq_batches_mismatch(tmp_path: Path) -> None:

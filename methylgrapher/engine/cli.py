@@ -63,7 +63,8 @@ def main(argv=None):
         pass
 
     try:
-        thread = int(thread)
+        # config.get is untyped and may return str; int inputs stay numeric via str().
+        thread = int(str(thread))
     except Exception:
         thread = 1
 
@@ -180,6 +181,7 @@ def main(argv=None):
 
             se = utility.SystemExecute()
             fout, flog = se.execute(cmd, stdout=None, stderr=None)
+            assert fout is not None and flog is not None
             for line in fout:
                 line = line.decode("utf-8")
                 freport.write(line)

@@ -14,6 +14,7 @@ import string
 import hashlib
 import subprocess
 import multiprocessing
+from typing import Any
 
 
 atcg_complement_dict = {
@@ -722,7 +723,7 @@ def estimate_conversion_rate(index_prefix, work_dir):
         raise Exception(
             "Cannot find lambda phage segment id in the index report file. Did you run PrepareGenome with spike-in genome?")
 
-    conversion_rate_by_context = {}
+    conversion_rate_by_context: dict[str, Any] = {}
     graph_methyl_fp = f"{work_dir}/graph.methyl"
     # print(lambda_segment_id)
     with open(graph_methyl_fp) as graph_methyl_fh:
@@ -799,6 +800,7 @@ def vg_binary_check(vg_path=None):
 
     res = f"Checking vg binary @ {vg_path}\n"
 
+    assert stdout is not None and stderr is not None
     for l in stdout:
         res += l.decode('utf-8')
 

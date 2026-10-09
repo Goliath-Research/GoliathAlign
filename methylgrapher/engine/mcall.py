@@ -70,7 +70,7 @@ def alignment_path_parse(path):
         else:
             element += i
 
-    res[0].append(element)
+    res[0].append(element)  # pyrefly: ignore[bad-argument-type]
     assert len(res[0]) == len(res[1])
     assert "" not in res[0]
     return res
@@ -349,7 +349,7 @@ def alignment_to_methylation(best_alignments, sequence_dict, cg_only=True, perfo
 
         path_seq_portion = path_sequence[path_start:path_end]
         bs_read_portion = original_bs_read[query_start:query_end]
-        phred_score_portion = phred_score[query_start:query_end]
+        phred_score_portion = phred_score[query_start:query_end]  # pyrefly: ignore[unsupported-operation]
 
 
         # Reconstruct the alignment
@@ -603,7 +603,7 @@ def alignment_to_methylation(best_alignments, sequence_dict, cg_only=True, perfo
             if cg_only and category != "CG":
                 continue
 
-            d = (segmentID, segment_pos, base_strand, category, methylated)
+            d = (segmentID, segment_pos, base_strand, category, methylated)  # pyrefly: ignore[unbound-name]
             # Just to verify fragment coverage
             #if d in mcall_per_frag:
             #    assert best_alignment[0][1] == "R2"
@@ -792,7 +792,7 @@ def call_single(
         methylation_output.append(open(mo, "w"))
 
 
-    for best_alignments in alignment_parse(
+    for best_alignments in alignment_parse(  # pyrefly: ignore[missing-argument]
             work_dir,
             minimum_identity=minimum_identity, minimum_mapq=minimum_mapq, discard_multimapped=discard_multimapped
     ):

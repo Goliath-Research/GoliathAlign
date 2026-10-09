@@ -109,6 +109,14 @@ In-container paths are `/opt/goliath-align` (symlink `/opt/mojo-align`) and the 
 
 GitHub Actions is the CI for this repository (`.github/workflows/ci.yml`). Env family is `GOLIATH_ALIGN_*`.
 
+## Type checking
+
+Python helpers are checked with [Pyrefly](https://pyrefly.org). The config is [`pyrefly.toml`](pyrefly.toml). It follows the CI import path and the Python 3.13 interpreter locked by pixi. Mojo sources are outside the check. `methylgrapher/python_reference/` is frozen upstream and is excluded.
+
+```bash
+pixi run typecheck
+```
+
 ## Migration notes
 
 See [`MIGRATION_LOG.md`](MIGRATION_LOG.md) for the Python-to-Mojo science cutover and the 2026-09-28 repository rename.

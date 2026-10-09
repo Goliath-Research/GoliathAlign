@@ -12,7 +12,7 @@ import io
 import shutil
 import subprocess
 from concurrent.futures import Future, ThreadPoolExecutor
-from typing import BinaryIO, List, Optional
+from typing import IO, List, Optional, cast
 
 
 def _qname(header: bytes) -> str:
@@ -28,7 +28,7 @@ def _qname(header: bytes) -> str:
     return n.decode("ascii", "replace")
 
 
-def _open_rb(path: str) -> tuple[BinaryIO, Optional[subprocess.Popen[bytes]]]:
+def _open_rb(path: str) -> tuple[IO[bytes], Optional[subprocess.Popen[bytes]]]:
     low = path.lower()
     if not (low.endswith(".gz") or low.endswith(".gzip")):
         return open(path, "rb", buffering=8 * 1024 * 1024), None
@@ -41,9 +41,9 @@ def _open_rb(path: str) -> tuple[BinaryIO, Optional[subprocess.Popen[bytes]]]:
             bufsize=8 * 1024 * 1024,
         )
         assert proc.stdout is not None
-        buf = io.BufferedReader(proc.stdout, 8 * 1024 * 1024)
+        buf = io.BufferedReader(cast(io.RawIOBase, proc.stdout), 8 * 1024 * 1024)
         return buf, proc
-    return gzip.open(path, "rb"), None
+    return cast(IO[bytes], gzip.open(path, "rb")), None
 
 
 class FastqBatch:
@@ -112,7 +112,7 @@ class FastqBatch:
         self.qual2_len: List[int] = []
         self._seq_view = None
 
-    def _push(self, data: bytes) -> tuple[int, int]:
+    def _push(self, data: bytes | bytearray) -> tuple[int, int]:
         off = len(self.arena)
         self.arena.extend(data)
         return off, len(data)
@@ -232,7 +232,7 @@ class FastqPairReader:
 
     def __init__(self, path1: str, path2: str = "", bs_r1: str = "", bs_r2: str = "") -> None:
         self._f1, self._p1 = _open_rb(path1)
-        self._f2: Optional[BinaryIO] = None
+        self._f2: Optional[IO[bytes]] = None
         self._p2: Optional[subprocess.Popen[bytes]] = None
         if path2:
             self._f2, self._p2 = _open_rb(path2)
@@ -248,7 +248,7 @@ class FastqPairReader:
         return self._pool.submit(self.read_batch, n_pairs)
 
     def _one(
-        self, fh: BinaryIO, tr: Optional[bytes]
+        self, fh: IO[bytes], tr: Optional[bytes]
     ) -> tuple[str, bytearray, bytearray, bytearray] | None:
         n = fh.readline()
         if not n:

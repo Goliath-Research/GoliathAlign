@@ -61,6 +61,9 @@ class GraphicalFragmentAssemblyAbstract(object):
     def get_child_links(self, segment_ID):
         raise NotImplementedError
 
+    def get_parent_link_count(self, segment_ID):
+        raise NotImplementedError
+
     def get_walk(self, something):
         raise NotImplementedError
 
@@ -391,7 +394,7 @@ class GraphicalFragmentAssemblySQL(GraphicalFragmentAssemblyAbstract):
         self.cursor_obj = None
 
     # Connect to database
-    def parse(self, gfa_db_path, read_only=False):
+    def parse(self, gfa_db_path, read_only=False):  # pyrefly: ignore[bad-override]
 
         if read_only:
             gfa_db_path = "file:" + gfa_db_path + "?mode=ro"
@@ -533,7 +536,7 @@ class GraphicalFragmentAssemblySQL(GraphicalFragmentAssemblyAbstract):
                 # print("W", len(l), l[1:6])
                 # print("POS vs NEG", pos, neg)
                 for j in [2, 4, 5]:
-                    l[j] = int(l[j])
+                    l[j] = int(l[j])  # pyrefly: ignore[unsupported-operation]
 
                 self.execute(
                     'INSERT INTO walk (sample, haplotype, sequenceID, start, end, walk) VALUES (?, ?, ?, ?, ?, ?)',
@@ -542,7 +545,7 @@ class GraphicalFragmentAssemblySQL(GraphicalFragmentAssemblyAbstract):
             else:
                 continue
 
-        self.connection.commit()
+        self.connection.commit()  # pyrefly: ignore[missing-attribute]
 
 
     def get_sequence_by_segment_ID(self, segment_ID):
