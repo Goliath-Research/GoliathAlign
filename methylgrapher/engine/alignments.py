@@ -352,9 +352,10 @@ def alignment(
             )
             return ref_type, engine_used
 
-        fout, flog = se.execute(
+        fout, _flog = se.execute(
             cmd_run, stdout=None, stderr=alignment_log, env=pin_env
         )
+        assert fout is not None
         for line in fout:
             line = line.decode("utf-8")
             stripped = line.strip()

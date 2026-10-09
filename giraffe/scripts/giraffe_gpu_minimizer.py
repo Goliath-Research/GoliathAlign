@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import os
 import time
-from typing import List, Optional, Sequence, Tuple
+from typing import Any, List, Optional, Sequence, Tuple
 
 import numpy as np
 
@@ -139,7 +139,7 @@ def _minimizers_cpu(seq: str, k: int, w: int) -> List[MinimizerOcc]:
     return results
 
 
-def _wang_hash_vec(keys: "object") -> "object":
+def _wang_hash_vec(keys: Any) -> Any:
     import cupy as cp  # type: ignore
 
     key = keys.astype(cp.uint64)

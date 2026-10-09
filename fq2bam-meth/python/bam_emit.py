@@ -15,7 +15,7 @@ import struct
 import zlib
 from pathlib import Path
 from concurrent.futures import Future, ThreadPoolExecutor
-from typing import Sequence
+from typing import Any, BinaryIO, Protocol, Sequence
 
 _BAM_MAGIC = b"BAM\x01"
 _BGZF_EOF = bytes.fromhex(
@@ -110,7 +110,7 @@ class _BgzfWriter:
         if self._threads > 1:
             self._pool = ThreadPoolExecutor(max_workers=self._threads)
 
-    def write(self, data: bytes | bytearray) -> None:
+    def write(self, data: bytes | bytearray | memoryview) -> None:
         self._buf.extend(data)
         self._drain_full_blocks()
 
@@ -207,7 +207,7 @@ class BamArena:
             self._spill.mkdir(parents=True, exist_ok=True)
         self._chunks: list[bytearray] = []
         self._maps: list[mmap.mmap | None] = []
-        self._headers: list[object | None] = []
+        self._headers: list[Any] = []
         self._lens: list[int] = []
         self._n = 0
         self._sorted = bytearray()
@@ -712,7 +712,7 @@ class BamRunStore:
         self._n += 1
         return idx
 
-    def merge_into(self, writer: BamWriter, do_markdup: bool = True) -> int:
+    def merge_into(self, writer: _BamSink, do_markdup: bool = True) -> int:
         """K-way merge coord-sorted runs into ``writer``. Returns dups marked."""
         if not self._runs:
             return 0
@@ -724,7 +724,7 @@ class BamRunStore:
         if do_markdup:
             dups_marked = _markdup_runs(loaded, flags)
         heap: list[tuple[tuple[int, int], int, int]] = []
-        fhs: list[object] = []
+        fhs: list[BinaryIO] = []
         heads: list[bytes | None] = []
         for rid, (_keys, bam) in enumerate(loaded):
             fh = open(bam, "rb", buffering=8 * 1024 * 1024)
@@ -753,8 +753,23 @@ class BamRunStore:
         return dups_marked
 
 
+class _DupRunKeys(Protocol):
+    """Fields ``_markdup_runs`` reads. Tests duck-type this with SimpleNamespace."""
+
+    n: int
+    dupperm: Any
+    dhi: Any
+    dlo: Any
+    score: Any
+    pair: Any
+
+
+class _BamSink(Protocol):
+    def write_bytes(self, data: bytes | bytearray | memoryview) -> None: ...
+
+
 def _markdup_runs(
-    loaded: Sequence[tuple[_RunKeys, Path]],
+    loaded: Sequence[tuple[_DupRunKeys, Path]],
     flags: list[array.array],
 ) -> int:
     """Same Picard-style rule as ``gpu_sort_markdup`` over k run heads."""

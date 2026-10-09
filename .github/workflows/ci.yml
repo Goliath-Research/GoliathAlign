@@ -40,6 +40,12 @@ jobs:
             methylgrapher/src/main.mojo help
           ./bin/methylGrapher help
 
+      - name: Pyrefly
+        run: |
+          set -euo pipefail
+          export PATH="$HOME/.pixi/bin:$PATH"
+          pixi run typecheck
+
       - name: Pytest subset
         run: |
           set -euo pipefail

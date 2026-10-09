@@ -309,6 +309,7 @@ def require_index_capacity(
         )
     if info.free_bytes < need_total:
         if budget_mode == "fraction":
+            assert hbm_fraction is not None
             raise RuntimeError(
                 "GPU HBM insufficient for configured free-fraction budget: need "
                 f"{report['need_gib']:.2f} GiB free "
@@ -317,6 +318,7 @@ def require_index_capacity(
                 "Set METHYLGRAPHER_GPU_HBM_FRACTION to tune; ensure no other "
                 "process holds HBM, and that the host worker released the prior action."
             )
+        assert overhead is not None
         raise RuntimeError(
             "GPU HBM insufficient for Mojo DeviceContext working set: science "
             f"slabs are {report['science_gib']:.2f} GiB but observed residency is "
