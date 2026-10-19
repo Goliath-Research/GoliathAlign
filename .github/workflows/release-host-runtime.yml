@@ -1,0 +1,81 @@
+name: Release jammy host runtime
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version label written into VERSION.txt (default: tag or 0.0.0)
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  host-runtime:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Free disk
+        run: |
+          set -euo pipefail
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc || true
+          df -h /
+
+      - name: Package jammy host runtime
+        id: pkg
+        run: |
+          set -euo pipefail
+          VER="${{ inputs.version }}"
+          if [[ -z "$VER" ]]; then
+            VER="${GITHUB_REF_NAME#v}"
+          fi
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+          bash scripts/package_host_runtime.sh \
+            --version "$VER" \
+            --output "${{ runner.temp }}/goliath-align-host-linux-amd64-jammy.tar.gz"
+
+      - name: Offline help gate (ubuntu:22.04 --network none)
+        run: |
+          set -euo pipefail
+          STAGE="${{ runner.temp }}/ga-check"
+          mkdir -p "$STAGE"
+          tar -C "$STAGE" -xzf "${{ runner.temp }}/goliath-align-host-linux-amd64-jammy.tar.gz"
+          printf '%s\n' \
+            '#!/usr/bin/env bash' \
+            'set -euo pipefail' \
+            'MG=/opt/goliath-align/bin/methylGrapher' \
+            'if ! "$MG" help >/tmp/h.txt 2>&1; then' \
+            '  METHYLGRAPHER_MCALL_ENGINE=python "$MG" help >/tmp/h.txt 2>&1' \
+            'fi' \
+            'head -n 5 /tmp/h.txt' \
+            'test -s /tmp/h.txt' \
+            'for sub in MojoFq2bamMeth MethylCall MergeCpG ConversionRate QC; do' \
+            '  "$MG" "$sub" --help >/tmp/"$sub".txt 2>&1 || "$MG" help "$sub" >/tmp/"$sub".txt 2>&1 || true' \
+            '  echo "sub $sub bytes=$(wc -c </tmp/"$sub".txt)"' \
+            'done' \
+            >"$STAGE/probe.sh"
+          chmod +x "$STAGE/probe.sh"
+          docker pull ubuntu:22.04
+          docker run --rm --network none --user 0 \
+            -v "$STAGE/goliath-align:/opt/goliath-align:ro" \
+            -v "$STAGE/probe.sh:/probe.sh:ro" \
+            ubuntu:22.04 bash /probe.sh
+
+      - name: Publish GitHub Release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          VER="${{ steps.pkg.outputs.version }}"
+          TAG="v${VER}"
+          FILE="${{ runner.temp }}/goliath-align-host-linux-amd64-jammy.tar.gz"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$FILE" --clobber
+          else
+            gh release create "$TAG" --title "GoliathAlign ${VER}" --generate-notes "$FILE"
+          fi
