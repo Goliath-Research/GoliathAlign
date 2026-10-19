@@ -52,10 +52,16 @@ apt-get update -qq
 apt-get install -y -qq ca-certificates curl git build-essential >/dev/null
 curl -fsSL https://pixi.sh/install.sh | bash
 export PATH="$HOME/.pixi/bin:$PATH"
-cd /src
+export PIXI_NO_TELEMETRY=1
+export DO_NOT_TRACK=1
+# /src is mounted read-only; pixi needs a writable project dir for .pixi/
+rm -rf /build
+mkdir -p /build
+cp -a /src/. /build/
+cd /build
 pixi install
 bash scripts/stage_flat_image_tree.sh /out/flat
-PIXI_ENV="/src/.pixi/envs/default"
+PIXI_ENV="/build/.pixi/envs/default"
 [[ -x "$PIXI_ENV/bin/mojo" ]] || { echo "mojo missing after pixi install" >&2; exit 1; }
 DEST=/out/goliath-align
 rm -rf "$DEST"
