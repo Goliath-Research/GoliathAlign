@@ -37,7 +37,7 @@ for c in docker podman; do command -v "$c" >/dev/null 2>&1 && { RT=$c; break; };
 [[ -n "$RT" ]] || die "docker or podman required"
 
 STAGE="$(mktemp -d)"
-trap 'rm -rf "$STAGE"' EXIT
+trap 'sudo rm -rf "$STAGE" 2>/dev/null || rm -rf "$STAGE" 2>/dev/null || true' EXIT
 mkdir -p "$STAGE/out"
 
 log "pulling ubuntu:22.04; building host runtime (pixi + Mojo) — this takes a while"
