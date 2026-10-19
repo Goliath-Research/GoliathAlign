@@ -102,18 +102,46 @@ cat >"$DEST/bin/methylGrapher" <<'LAUNCH'
 set -euo pipefail
 SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
 ROOT="$(cd "$(dirname "$SCRIPT_PATH")/.." && pwd)"
-export PYTHONPATH="${ROOT}${PYTHONPATH:+:$PYTHONPATH}"
-cfg="$ROOT/mojo-env/share/max/modular.cfg"
-if [[ -f "$cfg" ]] && grep -q '__GOLIATH_ALIGN_HOME__' "$cfg" 2>/dev/null; then
-  sed -i "s|__GOLIATH_ALIGN_HOME__|${ROOT}|g" "$cfg"
+export PYTHONPATH="${ROOT}/scripts:${ROOT}${PYTHONPATH:+:$PYTHONPATH}"
+
+_goliath_python() {
+  if [[ -x "${ROOT}/mojo-env/bin/python3" ]]; then
+    export LD_LIBRARY_PATH="${ROOT}/mojo-env/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+    export PYTHONHOME="${ROOT}/mojo-env"
+    export PATH="${ROOT}/mojo-env/bin:${PATH}"
+    printf '%s\n' "${ROOT}/mojo-env/bin/python3"
+  else
+    printf '%s\n' python3
+  fi
+}
+
+_goliath_run_python() {
+  local py
+  py="$(_goliath_python)"
+  cd "${ROOT}"
+  exec "$py" -m engine.cli "$@"
+}
+
+# modular.cfg may contain __GOLIATH_ALIGN_HOME__; never sed -i the install tree
+# (workers mount it read-only). Materialize a temp MODULAR_HOME when needed.
+_cfg_src="${ROOT}/mojo-env/share/max"
+if [[ -f "${_cfg_src}/modular.cfg" ]] && grep -q '__GOLIATH_ALIGN_HOME__' "${_cfg_src}/modular.cfg" 2>/dev/null; then
+  _mh="${TMPDIR:-/tmp}/goliath-align-modular-home-$$"
+  rm -rf "${_mh}"
+  mkdir -p "${_mh}"
+  cp -a "${_cfg_src}/." "${_mh}/"
+  sed -i "s|__GOLIATH_ALIGN_HOME__|${ROOT}|g" "${_mh}/modular.cfg"
+  export MODULAR_HOME="${_mh}"
+elif [[ -d "${_cfg_src}" ]]; then
+  export MODULAR_HOME="${_cfg_src}"
 fi
+
 _mcall_engine="$(printf '%s' "${METHYLGRAPHER_MCALL_ENGINE:-native}" | tr '[:upper:]' '[:lower:]')"
 if [[ "${_mcall_engine}" == "python" ]]; then
-  exec python3 -m engine.cli "$@"
+  _goliath_run_python "$@"
 fi
 MOJO_BIN="${ROOT}/mojo-env/bin/mojo"
 if [[ -x "${MOJO_BIN}" ]]; then
-  export MODULAR_HOME="${ROOT}/mojo-env/share/max"
   export LD_LIBRARY_PATH="${ROOT}/mojo-env/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
   export PATH="${ROOT}/mojo-env/bin:${PATH}"
   if [[ -z "${MODULAR_NVPTX_COMPILER_PATH:-}" ]]; then
@@ -123,7 +151,6 @@ if [[ -x "${MOJO_BIN}" ]]; then
   fi
   export MODULAR_CACHE_DIR="${MODULAR_CACHE_DIR:-/tmp/modular_cache}"
   mkdir -p "${MODULAR_CACHE_DIR}" 2>/dev/null || true
-  export PYTHONPATH="${ROOT}/scripts:${ROOT}${PYTHONPATH:+:$PYTHONPATH}"
   if [[ -e "${ROOT}/mojo-env/lib/libpython3.13.so.1.0" ]]; then
     export LD_PRELOAD="${ROOT}/mojo-env/lib/libpython3.13.so.1.0${LD_PRELOAD:+:$LD_PRELOAD}"
     export PYTHONHOME="${ROOT}/mojo-env"
@@ -131,7 +158,7 @@ if [[ -x "${MOJO_BIN}" ]]; then
   cd "${ROOT}"
   exec "${MOJO_BIN}" src/main.mojo "$@"
 fi
-exec python3 -m engine.cli "$@"
+_goliath_run_python "$@"
 LAUNCH
 chmod +x "$DEST/bin/methylGrapher"
 for _ptx in /usr/bin/ptxas /usr/lib/cuda/bin/ptxas /usr/local/cuda/bin/ptxas; do

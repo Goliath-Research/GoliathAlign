@@ -49,13 +49,24 @@ jobs:
             '#!/usr/bin/env bash' \
             'set -euo pipefail' \
             'MG=/opt/goliath-align/bin/methylGrapher' \
-            'if ! "$MG" help >/tmp/h.txt 2>&1; then' \
-            '  METHYLGRAPHER_MCALL_ENGINE=python "$MG" help >/tmp/h.txt 2>&1' \
+            'FALLBACK=' \
+            '_st=0' \
+            '"$MG" help >/tmp/h.txt 2>&1 || _st=$?' \
+            'if [[ "${_st}" -ne 0 ]]; then' \
+            '  echo "native help failed (exit ${_st}); trying METHYLGRAPHER_MCALL_ENGINE=python"' \
+            '  echo "---- native stderr/stdout ----"; cat /tmp/h.txt || true' \
+            '  _pst=0' \
+            '  METHYLGRAPHER_MCALL_ENGINE=python "$MG" help >/tmp/h.txt 2>&1 || _pst=$?' \
+            '  if [[ "${_pst}" -ne 0 ]]; then' \
+            '    echo "---- python help failed (exit ${_pst}) ----"; cat /tmp/h.txt || true; exit 1' \
+            '  fi' \
+            '  FALLBACK=python' \
             'fi' \
+            'if [[ -n "$FALLBACK" ]]; then echo "offline gate: fell back to METHYLGRAPHER_MCALL_ENGINE=python"; fi' \
             'head -n 5 /tmp/h.txt' \
             'test -s /tmp/h.txt' \
             'for sub in MojoFq2bamMeth MethylCall MergeCpG ConversionRate QC; do' \
-            '  "$MG" "$sub" --help >/tmp/"$sub".txt 2>&1 || "$MG" help "$sub" >/tmp/"$sub".txt 2>&1 || true' \
+            '  "$MG" "$sub" --help >/tmp/"$sub".txt 2>&1 || METHYLGRAPHER_MCALL_ENGINE=python "$MG" "$sub" --help >/tmp/"$sub".txt 2>&1 || "$MG" help "$sub" >/tmp/"$sub".txt 2>&1 || true' \
             '  echo "sub $sub bytes=$(wc -c </tmp/"$sub".txt)"' \
             'done' \
             >"$STAGE/probe.sh"
