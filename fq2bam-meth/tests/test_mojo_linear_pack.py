@@ -85,3 +85,18 @@ def test_streaming_pack_matches_legacy(tmp_path: Path, k: int, bits, mem_gb, siz
     seq_bytes = (out / "sequences.bin").read_bytes()
     assert seq_bytes == b"".join(s for _, s in read_fasta_contigs(fasta))
     assert not (out / ".build_tmp").exists()
+
+
+@pytest.mark.parametrize(
+    "text,want",
+    [
+        (b">a x\nACgt\nNN\n>b\n\n>c\r\nAC\r\nGT\r\n", [("a", b"ACGTNN"), ("b", b""), ("c", b"ACGT")]),
+        (b">only\nACGT", [("only", b"ACGT")]),
+        (b">e\n>f\nA\n", [("e", b""), ("f", b"A")]),
+        (b"", []),
+    ],
+)
+def test_iter_fasta_contigs_edge_cases(tmp_path: Path, text: bytes, want) -> None:
+    fasta = tmp_path / "x.fa"
+    fasta.write_bytes(text)
+    assert read_fasta_contigs(fasta) == want
