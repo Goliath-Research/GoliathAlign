@@ -223,7 +223,8 @@ def encode_kmers_contig(seq: bytes, k: int, contig_id: int) -> Tuple[np.ndarray,
     return kmers[keep], locs[keep]
 
 
-_DEFAULT_BUCKET_BITS = 10
+_DEFAULT_BUCKET_BITS = 8
+_MAX_BUCKET_BITS = 16
 _DEFAULT_MAX_MEM_GB = 16.0
 # Conservative working-set estimates (bytes per element) used to size chunks.
 _PASS1_BYTES_PER_BASE = 96
@@ -233,7 +234,8 @@ _SPLIT_BITS = 8
 
 def _bucket_bits(k: int, requested: Optional[int]) -> int:
     bits = _DEFAULT_BUCKET_BITS if requested is None else int(requested)
-    return max(0, min(bits, 2 * k))
+    # Each run keeps a (2**bits + 1) offset table; cap so that stays small.
+    return max(0, min(bits, 2 * k, _MAX_BUCKET_BITS))
 
 
 def _append(path: Path, arr: np.ndarray) -> None:
@@ -392,6 +394,11 @@ def build_dense_pack(
         f"bucket_budget={budget} buckets={n_buckets})",
         flush=True,
     )
+    # Pass 1: one sorted-by-bucket "run" file per encoded chunk, written
+    # sequentially (k-mers | contig ids | positions). Shared network volumes
+    # handle a few large sequential writes far better than many small appends.
+    isz = kmer_dtype.itemsize
+    runs: List[Tuple[Path, int, np.ndarray]] = []  # (path, n, bucket start offsets)
     names: List[str] = []
     total_bases = 0
     counts = np.zeros(n_buckets, dtype=np.int64)
@@ -410,38 +417,85 @@ def build_dense_pack(
             if bits:
                 bucket = (km >> shift).astype(np.int64)
                 order = np.argsort(bucket, kind="stable")
-                bucket = bucket[order]
+                bc = np.bincount(bucket, minlength=n_buckets)
+                del bucket
                 km, pos = km[order], pos[order]
                 del order
-                present, first = np.unique(bucket, return_index=True)
-                bounds = list(first) + [bucket.size]
-                del bucket
             else:
-                present, bounds = np.zeros(1, dtype=np.int64), [0, km.size]
-            km = km.astype(kmer_dtype)
-            for i, b in enumerate(present):
-                lo, hi = int(bounds[i]), int(bounds[i + 1])
-                st = _stem(int(b))
-                _append(Path(f"{st}.k"), km[lo:hi])
-                _append(Path(f"{st}.c"), np.full(hi - lo, cid, dtype="<u4"))
-                _append(Path(f"{st}.p"), pos[lo:hi])
-                counts[int(b)] += hi - lo
+                bc = np.asarray([km.size], dtype=np.int64)
+            starts = np.zeros(n_buckets + 1, dtype=np.int64)
+            starts[1:] = np.cumsum(bc)
+            counts += bc
+            run = work / f"run{len(runs):05d}.bin"
+            with run.open("wb", buffering=_IO_BUFFER) as fh:
+                fh.write(km.astype(kmer_dtype).tobytes())
+                fh.write(np.full(km.size, cid, dtype="<u4").tobytes())
+                fh.write(pos.tobytes())
+            runs.append((run, int(km.size), starts))
             del km, pos
         del seq
         if (cid + 1) % 5 == 0:
             print(f"  encoded {cid + 1} ({name}, {n} bp)", flush=True)
     if not names:
         raise RuntimeError(f"no contigs in {c2t_fasta}")
-    print(f"contigs={len(names)} bases={total_bases}", flush=True)
+    print(f"contigs={len(names)} bases={total_bases} runs={len(runs)}", flush=True)
     n_postings = int(counts.sum())
     if n_postings == 0:
         raise RuntimeError("no valid k-mers (check alphabet / k)")
 
     print(f"sorting {n_postings} postings in {n_buckets} buckets…", flush=True)
     writer = _PackWriter(out_dir)
-    for b in range(n_buckets):
-        if counts[b]:
-            _emit_bucket(_stem(b), int(counts[b]), 2 * k - bits, kmer_dtype, budget, writer)
+    handles = [open(r, "rb", buffering=0) for r, _, _ in runs]
+
+    def _sections(rn: int, a: int, c: int) -> List[Tuple[int, int, np.dtype, str]]:
+        u4 = np.dtype("<u4")
+        return [
+            (a * isz, c * isz, kmer_dtype, "k"),
+            (rn * isz + a * 4, c * 4, u4, "c"),
+            (rn * isz + rn * 4 + a * 4, c * 4, u4, "p"),
+        ]
+
+    def _gather(b: int) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        parts: dict = {"k": [], "c": [], "p": []}
+        for (_, rn, st), fh in zip(runs, handles):
+            a, c = int(st[b]), int(st[b + 1] - st[b])
+            if c == 0:
+                continue
+            for off, nbytes, dt, key in _sections(rn, a, c):
+                fh.seek(off)
+                parts[key].append(np.frombuffer(fh.read(nbytes), dtype=dt))
+        return (
+            np.concatenate(parts["k"]),
+            np.concatenate(parts["c"]),
+            np.concatenate(parts["p"]),
+        )
+
+    try:
+        for b in range(n_buckets):
+            cnt = int(counts[b])
+            if cnt == 0:
+                continue
+            if cnt <= budget:
+                km, cid_a, pos_a = _gather(b)
+                order = np.argsort(km, kind="stable")
+                writer.emit_sorted(km[order], cid_a[order], pos_a[order])
+                del km, cid_a, pos_a, order
+                continue
+            # Oversized (skewed) bucket: stream it to bucket files run by run,
+            # then split/emit with bounded memory.
+            st_ = _stem(b)
+            for (_, rn, st), fh in zip(runs, handles):
+                a, c = int(st[b]), int(st[b + 1] - st[b])
+                for lo in range(0, c, budget):
+                    m_ = min(budget, c - lo)
+                    for off, nbytes, _dt, key in _sections(rn, a + lo, m_):
+                        fh.seek(off)
+                        with Path(f"{st_}.{key}").open("ab", buffering=0) as out:
+                            out.write(fh.read(nbytes))
+            _emit_bucket(st_, cnt, 2 * k - bits, kmer_dtype, budget, writer)
+    finally:
+        for fh in handles:
+            fh.close()
     writer.close()
     n_keys = writer.n_keys
     assert writer.base == n_postings
