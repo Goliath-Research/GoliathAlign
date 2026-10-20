@@ -54,6 +54,7 @@ jobs:
           pixi run python -m pytest \
             gpu-common/tests \
             fq2bam-meth/tests/test_fq2bam_meth.py \
+            fq2bam-meth/tests/test_mojo_linear_pack.py \
             methylgrapher/tests/test_align_backends.py \
             methylgrapher/tests/test_align_backends_ready.py \
             giraffe/tests/test_giraffe_gaf_parity.py \
