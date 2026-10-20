@@ -34,6 +34,9 @@ _BASE_CODE[ord("g")] = 2
 _BASE_CODE[ord("t")] = 3
 
 
+_IO_BUFFER = 16 << 20
+
+
 def pack_is_complete(cache_dir: Path) -> bool:
     return (
         (cache_dir / "meta.json").is_file()
@@ -55,7 +58,7 @@ def write_sequences_bin(c2t_fasta: Path, out_dir: Path) -> dict:
     names: List[str] = []
     starts: List[int] = []
     seq_path = out_dir / "sequences.bin"
-    with seq_path.open("wb") as fh:
+    with seq_path.open("wb", buffering=_IO_BUFFER) as fh:
         for name, seq in iter_fasta_contigs(c2t_fasta):
             names.append(name)
             starts.append(fh.tell())
@@ -159,21 +162,32 @@ def ensure_dense_pack(
 
 
 def iter_fasta_contigs(path: Path) -> Iterator[Tuple[str, bytes]]:
-    """Yield (name, upper-cased sequence) one contig at a time (bounded memory)."""
-    name = ""
-    chunks: List[bytes] = []
-    with Path(path).open("rb") as fh:
-        for raw in fh:
-            if raw.startswith(b">"):
-                if name:
-                    yield name, b"".join(chunks).upper()
-                header = raw[1:].decode("ascii", errors="replace").strip()
-                name = header.split()[0] if header else "unnamed"
-                chunks = []
-            else:
-                chunks.append(raw.strip())
-    if name:
-        yield name, b"".join(chunks).upper()
+    """Yield (name, upper-cased sequence) one contig at a time (bounded memory).
+
+    Memory-maps the FASTA and slices whole records, stripping line breaks in C
+    (``bytes.translate``): per-line Python iteration over a shared /work
+    volume ran at ~8 MB/s; this runs at disk speed.
+    """
+    import mmap
+
+    path = Path(path)
+    if path.stat().st_size == 0:
+        return
+    with path.open("rb") as fh, mmap.mmap(fh.fileno(), 0, access=mmap.ACCESS_READ) as mm:
+        size = len(mm)
+        start = mm.find(b">")
+        while start != -1:
+            eol = mm.find(b"\n", start)
+            if eol == -1:
+                eol = size
+            header = mm[start + 1 : eol].decode("ascii", errors="replace").strip()
+            name = header.split()[0] if header else "unnamed"
+            nxt = mm.find(b"\n>", eol)
+            end = size if nxt == -1 else nxt + 1
+            seq = mm[eol + 1 : end].translate(None, b"\r\n \t").upper()
+            yield name, seq
+            del seq
+            start = -1 if nxt == -1 else nxt + 1
 
 
 def read_fasta_contigs(path: Path) -> List[Tuple[str, bytes]]:
@@ -223,7 +237,7 @@ def _bucket_bits(k: int, requested: Optional[int]) -> int:
 
 
 def _append(path: Path, arr: np.ndarray) -> None:
-    with path.open("ab") as fh:
+    with path.open("ab", buffering=0) as fh:
         fh.write(arr.tobytes())
 
 
@@ -231,9 +245,9 @@ class _PackWriter:
     """Appends sorted CSR output for consecutive k-mer ranges."""
 
     def __init__(self, out_dir: Path) -> None:
-        self.kf = (out_dir / "kmers.bin").open("wb")
-        self.of = (out_dir / "offsets.bin").open("wb")
-        self.pf = (out_dir / "postings.bin").open("wb")
+        self.kf = (out_dir / "kmers.bin").open("wb", buffering=_IO_BUFFER)
+        self.of = (out_dir / "offsets.bin").open("wb", buffering=_IO_BUFFER)
+        self.pf = (out_dir / "postings.bin").open("wb", buffering=_IO_BUFFER)
         self.base = 0
         self.n_keys = 0
         self.last_key: Optional[int] = None
