@@ -1,0 +1,62 @@
+name: Deploy docs
+
+# Publish on main and on manual dispatch only. Pull requests keep the CI
+# docs job, which builds the site and does not deploy.
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+# The build job reads the repo and the Pages site. The deploy job replaces
+# this set with the Pages write and OIDC permissions deploy-pages requires.
+permissions:
+  contents: read
+
+# One production deployment at a time. Do not cancel an in-progress deploy.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v6
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Build the MkDocs site
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check 'mkdocs>=1.6,<2' 'mkdocs-material>=9.5,<10'
+          mkdocs build --strict
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

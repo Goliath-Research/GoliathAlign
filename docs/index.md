@@ -30,4 +30,4 @@ Package notes that sit next to the code:
 | `methylgrapher/docs/BENCHMARK_MCALL.md` | MethylCall subset timing |
 | `numeric/README.md` | Centroid-stream kernels |
 
-This site is optional. From a checkout, `mkdocs build` writes `site/`. The CI docs job runs that build and has no deploy step.
+This site is published at <https://goliath-research.github.io/GoliathAlign/>. From a checkout, `mkdocs build` writes `site/`. Pull requests run that build in the CI docs job and do not deploy. Pushes to `main` publish with GitHub Pages.
