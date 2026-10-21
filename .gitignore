@@ -16,7 +16,7 @@ build/
 .idea/
 .vscode/
 
-# MkDocs build output (CI builds the site and does not publish it)
+# MkDocs build output (the Pages workflow publishes an artifact; this tree is not committed)
 site/
 
 # Runtime outputs

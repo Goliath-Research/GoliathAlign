@@ -1,5 +1,6 @@
 site_name: GoliathAlign
 site_description: Standalone multi-platform bisulfite alignment (bwa-meth / Clara Parabricks fq2bam_meth method).
+site_url: https://goliath-research.github.io/GoliathAlign/
 repo_url: https://github.com/Goliath-Research/GoliathAlign
 repo_name: Goliath-Research/GoliathAlign
 docs_dir: docs

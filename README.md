@@ -6,7 +6,7 @@ The command name is `methylGrapher`. Mojo is the implementation language. The pi
 
 License: MIT ([`LICENSE`](LICENSE)). `methylgrapher/` is a methylGrapher derivative; see [`methylgrapher/LICENSE`](methylgrapher/LICENSE) and [`methylgrapher/NOTICE`](methylgrapher/NOTICE).
 
-Longer notes live under [`docs/`](docs/index.md). An optional MkDocs Material site builds from that directory with `mkdocs build`. The CI docs job runs that build and has no deploy step.
+Longer notes live under [`docs/`](docs/index.md) and on the published site at <https://goliath-research.github.io/GoliathAlign/>. Pull requests build that MkDocs Material site in the CI docs job and do not deploy. Pushes to `main` publish it with GitHub Pages.
 
 ## Install
 
