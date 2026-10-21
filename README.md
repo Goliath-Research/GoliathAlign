@@ -1,122 +1,126 @@
 # GoliathAlign
 
-**GoliathApp** is the platform. **GoliathOmics** is the genomics product. **GoliathAlign** (formerly mojo-align) aligns reads. **MethylExtractor** calls methylation from linear BAM files. **GoliathWeb** is the public hub.
+GoliathAlign is a standalone bisulfite alignment toolkit. It maps whole-genome bisulfite reads on Linux x86-64 and ARM64, using CPU, NVIDIA CUDA, or AMD HIP through Mojo `DeviceContext`. The linear aligner, `MojoFq2bamMeth`, follows the directional C→T / G→A method used by [bwa-meth](https://github.com/brentp/bwa-meth) and by NVIDIA Clara Parabricks `fq2bam_meth`. The same install aligns reads to converted genome graphs and calls methylation from the resulting GAF.
 
-Index: [../GoliathApp/docs/workspace-index.md](../GoliathApp/docs/workspace-index.md).
+The command name is `methylGrapher`. Mojo is the implementation language. The pixi workspace in [`pixi.toml`](pixi.toml) is still named `mojo-align` and records version `0.1.0`. This tree was previously published as `mojo-align`. The GitHub repository is [Goliath-Research/GoliathAlign](https://github.com/Goliath-Research/GoliathAlign).
 
-Multiplatform Mojo aligner (MIT). It runs on Linux x86-64 and ARM64, on CPU and on NVIDIA CUDA or AMD HIP through Mojo `DeviceContext`. TPU and AWS Trainium are not implemented. The first product consumer is GoliathOmics whole-genome bisulfite sequencing. The linear path follows **bwa-meth**. `methylgrapher/` follows **methylGrapher**. Git history includes the former tree named `methylGrapher-mojo` (that repository no longer exists). This repository was named `mojo-align` until 2026-09-28. The local directory is GoliathAlign. The Git remote stays `Goliath-Research/mojo-align` until `gh repo rename GoliathAlign` is run on a logged-in machine; see [`MIGRATION_LOG.md`](MIGRATION_LOG.md).
+License: MIT ([`LICENSE`](LICENSE)). `methylgrapher/` is a methylGrapher derivative; see [`methylgrapher/LICENSE`](methylgrapher/LICENSE) and [`methylgrapher/NOTICE`](methylgrapher/NOTICE).
 
-Unified CLI remains `bin/methylGrapher`. Mojo is the language, not the product name.
+Longer notes live under [`docs/`](docs/index.md). An optional MkDocs Material site builds from that directory with `mkdocs build`. The CI docs job runs that build and has no deploy step.
 
-## One-cycle aliases
+## Install
 
-| Current | Still accepted |
-|---------|----------------|
-| `GOLIATH_ALIGN_*` | `MOJO_ALIGN_*` (deprecation warning) |
-| `/opt/goliath-align` | `/opt/mojo-align` (symlink in the image) |
-| Sibling checkout `../GoliathAlign` | `../mojo-align` |
-
-Image repository and tags stay `goliath/methylgrapher:*-mojo-*`.
-
-## Packages
-
-| Package | Role | License |
-|---------|------|---------|
-| `gpu-common/` | Portable DeviceContext device select + seed kernels + HBM preflight | **MIT** — see [`LICENSE`](LICENSE) |
-| `fq2bam-meth/` | Mojo linear WGBS mapper (`align.linear.mojo`); published **bwa-meth** method class | **MIT** — see [`LICENSE`](LICENSE) |
-| `giraffe/` | MojoGiraffe / GBZ stream map (`align.pangenome_wgbs.mojo`) | **MIT** — see [`LICENSE`](LICENSE) |
-| `methylgrapher/` | Science + Align orchestration + `engine/` CLI | **MIT** — [`methylgrapher/LICENSE`](methylgrapher/LICENSE) (methylGrapher) |
-| `numeric/` | Post-align DeviceContext kernels (centroid stream) | **MIT** — see [`LICENSE`](LICENSE) |
-
-The whole monorepo is MIT open source. Linear mapping follows [bwa-meth](https://github.com/brentp/bwa-meth); `methylgrapher/` is a methylGrapher derivative.
-
-## Align paths
-
-Canonical align IDs are folder names under each sample. GoliathOmics creates those directories. This repository writes only the `-work_dir` it is given. Before/after bakeoffs keep Clara and `vg` as first-class arms. Mojo is the preferred science path.
-
-| ID | Runtime | Role |
-|----|---------|------|
-| `align.linear.parabricks` | NVIDIA Parabricks `fq2bam_meth` | **Before** linear baseline |
-| `align.linear.mojo` | MojoFq2bamMeth (`fq2bam-meth`) | **After** portable linear |
-| `align.pangenome.parabricks` | Parabricks `giraffe` (BAM) | Stock non-BS pangenome (not WGBS GAF) |
-| `align.pangenome.vg` / `align.pangenome_wgbs.vg` | `vg giraffe` (`cpu_vg`) | **Before** named-coordinate GAF oracle |
-| `align.pangenome_wgbs.mojo` | MojoGiraffe dual-graph | **After** preferred WGBS science |
-
-Optional extract staging (GoliathOmics compare harness; not written by this CLI):
-
-| ID | Tool | Role |
-|----|------|------|
-| `extract.methylextractor/` | MethylExtractor | Production linear extract |
-| `extract.methyldackel/` | Upstream MethylDackel | Optional A/B only |
-
-```
-/work/samples/<sampleId>/
-  *.fastq.gz
-  align.linear.parabricks/   # BAM, BAI, metrics
-  align.linear.mojo/         # same shape — parity vs Parabricks
-  align.pangenome.parabricks/
-  align.pangenome.vg/          # or align.pangenome_wgbs.vg
-  align.pangenome_wgbs.mojo/
-  extract.methylextractor/     # optional staging
-  extract.methyldackel/        # optional A/B
-```
-
-Multiple align dirs may coexist for side-by-side parity and linear-to-pangenome comparisons. Comparison reports land under `/work/samples/_comparisons/<stamp>/`.
-
-## Quick start
+Pixi solves the Mojo / MAX toolchain, Python, pytest, and Pyrefly for `linux-64` and `linux-aarch64`:
 
 ```bash
+curl -fsSL https://pixi.sh/install.sh | bash   # once, if pixi is not on PATH
 pixi install
 ./bin/methylGrapher help
+```
+
+`samtools` is required for `MojoFq2bamMeth` (it is not a pixi dependency). `bwa` is required only when `METHYLGRAPHER_LINEAR_MAPPER=bwa` or when the Mojo mapper fails and falls back. `vg` is required for `PrepareGenome` and for the `cpu_vg` graph aligner.
+
+From a checkout, `./bin/methylGrapher` runs the Python engine (`python -m engine.cli`) through pixi. Set `METHYLGRAPHER_ENGINE=mojo` to compile and run `methylgrapher/src/main.mojo` instead. Both entry points accept `MojoFq2bamMeth` and call `engine.fq2bam_meth`.
+
+```bash
 METHYLGRAPHER_ENGINE=mojo ./bin/methylGrapher help
+pixi run typecheck
 pixi run python -m pytest
 ```
 
-## Linear parity (Clara vs Mojo)
+The published host runtime is separate from a pixi checkout. See [Release 0.1.0-jammy](docs/release.md).
 
-```bash
-fq2bam-meth/scripts/fetch_parabricks_sample.sh   # once → /work/samples/parabricks_sample
-fq2bam-meth/scripts/parity_linear_parabricks_vs_mojo.sh --device nvidia
-```
+## Platforms and devices
 
-Details: [`fq2bam-meth/docs/LINEAR_PARITY.md`](fq2bam-meth/docs/LINEAR_PARITY.md).
+| Host | How |
+|------|-----|
+| Linux x86-64 | pixi platform `linux-64` |
+| Linux ARM64 | pixi platform `linux-aarch64` |
 
-Mojo include paths (also set by `bin/methylGrapher`):
+Host architecture is independent of the compute device. `-device` and `METHYLGRAPHER_ALIGN_DEVICE` accept `auto`, `cpu`, `nvidia`, and `amd`.
+
+| Device | Kernel label | `DeviceContext` API |
+|--------|--------------|---------------------|
+| `nvidia` | `nvidia:sm_90` | `cuda` |
+| `amd` | `amdgpu:gfx942`, or `amdgpu:` plus `METHYLGRAPHER_AMDGPU_ARCH` | `hip` |
+| `cpu` | host | `cpu` |
+| `auto` | NVIDIA, then AMD, then CPU | probed in that order |
+
+`auto` tries `DeviceContext`, then `nvidia-smi`, then `rocm-smi` / `rocminfo`. A checkout compile with `METHYLGRAPHER_ENGINE=mojo` passes `--target-accelerator`. The default target is `nvidia:sm_90`. If `METHYLGRAPHER_AMDGPU_ARCH` is set and no target override is set, the target is `amdgpu:$METHYLGRAPHER_AMDGPU_ARCH`. Override either choice with `METHYLGRAPHER_TARGET_ACCELERATOR`.
+
+Names this tree reads first are `GOLIATH_ALIGN_*` and the directory `/opt/goliath-align`. `MOJO_ALIGN_*`, `METHYLGRAPHER_MOJO_*`, `/opt/mojo-align`, and `/opt/methylgrapher-mojo` still resolve, and the process prints a deprecation warning.
+
+## Packages
+
+| Path | Role |
+|------|------|
+| `gpu-common/` | Device selection, seed kernels, HBM preflight |
+| `fq2bam-meth/` | Linear WGBS mapper (`MojoFq2bamMeth`) |
+| `giraffe/` | Graph mapper (`MojoGiraffe`, GBZ stream map) |
+| `methylgrapher/` | `methylGrapher` CLI, `Align`, methylation calling |
+| `numeric/` | DeviceContext centroid-stream kernels |
+
+Mojo include paths, also set by `bin/methylGrapher`:
 
 ```text
 -I gpu-common/src -I fq2bam-meth/src -I giraffe/src -I methylgrapher/src -I numeric/src
 ```
 
-## Supported platforms
+## Linear alignment
 
-The pixi environment supports Linux x86-64 (`linux-64`) and Linux ARM64 (`linux-aarch64`) hosts. Host architecture is independent of the compute backends: CPU, NVIDIA CUDA, and AMD HIP. TPU and AWS Trainium backends are not implemented.
-
-## Fleet image
-
-This repo does not build the worker image. GoliathOmics `Dockerfile.mojo` expects a flat `engine/` + `src/` tree. Assemble it, then build from the GoliathOmics checkout (Docker image, and a `.sif` when Apptainer is installed):
+`MojoFq2bamMeth` is the linear whole-genome bisulfite aligner. It is the same method class as bwa-meth and Clara Parabricks `fq2bam_meth`: convert read 1 C→T and read 2 G→A, map against a C→T reference (preferring a bwa-meth dual-strand FASTA, `${REF}.bwameth.c2t`), and emit a coordinate-sorted, duplicate-marked BAM.
 
 ```bash
-bash scripts/stage_flat_image_tree.sh /tmp/goliath-align-flat
-export GOLIATH_ALIGN_ROOT=/tmp/goliath-align-flat   # or point at this repo; the build script stages it
-# in the GoliathOmics repo:
-#   bash scripts/build_goliath_align_image.sh
-#   bash scripts/run_goliath_align_sif.sh /work/goliath/images/methylgrapher-1.70-mojo-cuda.sif -- Align ...
+./bin/methylGrapher MojoFq2bamMeth \
+  -fq1 R1.fastq.gz -fq2 R2.fastq.gz -ref GRCh38.fa \
+  -out_bam sample.bam -out_qc_dir sample_qc -sample_id SAMPLE \
+  -device auto -t 16 -k 15
 ```
 
-In-container paths are `/opt/goliath-align` (symlink `/opt/mojo-align`) and the `methylGrapher` entrypoint. `MOJO_ALIGN_ROOT` still works for one cycle.
+The mapper writes:
 
-## CI
+| Output | Contents |
+|--------|----------|
+| `-out_bam` | BAM. The default `fm` engine writes coordinate-sorted, duplicate-marked BGZF and then runs `samtools index` (`.bai`). `parity`, `speed`, and `bwa` run `samtools fixmate`, `sort`, and `markdup` first. |
+| `-out_bam` parent `/ <sample_id>.json` | Parabricks-shaped metrics (`engine` is `mojo_fq2bam_meth`) |
+| `-out_qc_dir/alignment_summary.json` | `flagstat`, `samtools stats`, and the mapper name |
+| `-out_qc_dir/<sample_id>.json` | Copy of the metrics JSON |
+| `-work_dir/mojo_fq2bam_meth.log` | Command log. Without `-work_dir`, the log is under a temporary `mojo_fq2bam_*` directory |
 
-GitHub Actions is the CI for this repository (`.github/workflows/ci.yml`). Env family is `GOLIATH_ALIGN_*`.
+`METHYLGRAPHER_LINEAR_ENGINE` selects the Mojo mapper: `fm` (default; BWA `.bwt` / `.sa` / `.pac` on the converted reference), `parity` (frozen k-mer pack), or `speed` (k-mer consensus). `METHYLGRAPHER_LINEAR_MAPPER=bwa` forces BWA-MEM on CPU. If the Mojo mapper fails, the orchestrator falls back to BWA-MEM unless `METHYLGRAPHER_GPU_REQUIRE` is `1`, `true`, `yes`, or `on`.
 
-## Type checking
+Set `METHYLGRAPHER_WRITE_METH_TAGS=1` to add `XM:Z` and `XG:Z` tags after alignment. Details: [`fq2bam-meth/docs/LINEAR_FQ2BAM_SPEC.md`](fq2bam-meth/docs/LINEAR_FQ2BAM_SPEC.md), [`fq2bam-meth/docs/LINEAR_ENGINES.md`](fq2bam-meth/docs/LINEAR_ENGINES.md).
 
-Python helpers are checked with [Pyrefly](https://pyrefly.org). The config is [`pyrefly.toml`](pyrefly.toml). It follows the CI import path and the Python 3.13 interpreter locked by pixi. Mojo sources are outside the check. `methylgrapher/python_reference/` is frozen upstream and is excluded.
+A paired-end fixture lives at `fq2bam-meth/tests/data/fq2bam_fixture/`. Concordance against a Clara `fq2bam_meth` BAM is `fq2bam-meth/scripts/parity_linear_parabricks_vs_mojo.sh` (default gates: mapped-rate absolute delta ≤ 0.02, primary-contig idxstats Spearman ≥ 0.95).
+
+## Graph alignment and methylation calls
+
+`Align` converts the FASTQ pair, maps it to the C→T and G→A indexes under `-index_prefix`, and writes `alignment.gaf` in `-work_dir`. `-align_engine` (or `METHYLGRAPHER_ALIGN_ENGINE`) is `cpu_vg` (default; `vg giraffe` GAF with named coordinates), `mojo_giraffe`, or `gpu_giraffe`.
+
+`MojoGiraffe` maps one graph (GFA, or a GBZ quartet `-gbz` / `-dist` / `-min` / `-zipcodes`) straight to `-out_gaf`. Optional `-out_sam` plus `-segment_offsets` writes a linear SAM file.
+
+`MethylCall` reads `alignment.gaf` and writes `graph.methyl`. `MergeCpG` writes `graph.cpg.tsv`. `ConversionRate` prints a conversion-rate estimate. `PrepareGenome` builds the converted GFA pair, the CpG table, and the `vg giraffe` indexes those commands expect.
+
+`METHYLGRAPHER_MCALL_ENGINE=python` forces the Mojo CLI to run `Align`, `MethylCall`, `MergeCpG`, and `ConversionRate` through the Python engine.
+
+Command reference: [`docs/cli.md`](docs/cli.md). Graph contract: [`giraffe/docs/GIRAFFE_SPEC.md`](giraffe/docs/GIRAFFE_SPEC.md).
+
+## Flat tree and host runtime
+
+`scripts/stage_flat_image_tree.sh [DEST]` copies the packages into one tree (`engine/`, `src/`, `scripts/`, `tests/`, `bin/methylGrapher`). `DEST` defaults to `./_flat_image`.
+
+`scripts/package_host_runtime.sh` builds `goliath-align-host-linux-amd64-jammy.tar.gz` inside `ubuntu:22.04`. That archive is the artifact for release [0.1.0-jammy](docs/release.md). Its `bin/methylGrapher` runs the bundled `mojo` on `src/main.mojo`. Set `METHYLGRAPHER_MCALL_ENGINE=python` to run `python -m engine.cli` instead.
+
+Helper scripts under `fq2bam-meth/scripts/` such as `run_toy_fq2bam_meth.sh` treat the parent of `scripts/` as the root, which matches that flat tree (`bin/methylGrapher` beside `scripts/`). From this checkout, call `./bin/methylGrapher` with paths under `fq2bam-meth/tests/data/fq2bam_fixture/`. `fq2bam-meth/scripts/parity_linear_parabricks_vs_mojo.sh` walks two directories up and runs from this checkout.
+
+## CI and type checking
+
+GitHub Actions (`.github/workflows/ci.yml`) installs pixi, runs `methylGrapher help`, Pyrefly, a pytest subset, and the flat-tree stage. It also validates [`.goliath/product.json`](.goliath/product.json) and builds the MkDocs site. The docs job does not upload the site.
+
+Python helpers are checked with [Pyrefly](https://pyrefly.org) using [`pyrefly.toml`](pyrefly.toml) and the Python 3.13 interpreter locked by pixi. Mojo sources are outside the check. `methylgrapher/python_reference/` is frozen upstream and is excluded.
 
 ```bash
 pixi run typecheck
 ```
 
-## Migration notes
-
-See [`MIGRATION_LOG.md`](MIGRATION_LOG.md) for the Python-to-Mojo science cutover and the 2026-09-28 repository rename.
+History of the Python-to-Mojo port and the repository rename is in [`MIGRATION_LOG.md`](MIGRATION_LOG.md).

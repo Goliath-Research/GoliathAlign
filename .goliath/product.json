@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "id": "goliathalign",
+  "name": "GoliathAlign",
+  "tagline": "Standalone multi-platform bisulfite alignment, in the style of Clara Parabricks fq2bam_meth and bwa-meth.",
+  "description": "GoliathAlign maps whole-genome bisulfite reads on Linux x86-64 and ARM64, on CPU, NVIDIA CUDA, or AMD HIP. The linear aligner, `MojoFq2bamMeth`, follows the directional C→T / G→A method used by bwa-meth and by NVIDIA Clara Parabricks `fq2bam_meth`, and writes a coordinate-sorted BAM plus QC JSON. The same install aligns reads to converted genome graphs and calls methylation from the resulting GAF. Install a checkout with pixi, or unpack the Ubuntu 22.04 host runtime published as release `0.1.0-jammy`.",
+  "category": "component",
+  "features": [
+    {
+      "title": "Linear bisulfite alignment",
+      "description": "MojoFq2bamMeth converts read 1 C→T and read 2 G→A, maps them with an FM-index on a bwa-meth dual-strand reference (k-mer and BWA-MEM engines are selectable), and writes a duplicate-marked BAM, a BAI, and a Parabricks-shaped QC JSON."
+    },
+    {
+      "title": "CPU, NVIDIA, and AMD",
+      "description": "Device selection accepts auto, cpu, nvidia (nvidia:sm_90, CUDA), and amd (amdgpu:gfx942 or METHYLGRAPHER_AMDGPU_ARCH, HIP) through Mojo DeviceContext. Pixi solves linux-64 and linux-aarch64."
+    },
+    {
+      "title": "Graph alignment and methylation calls",
+      "description": "Align and MojoGiraffe write GAF for C→T and G→A graphs (vg giraffe, or the Mojo Giraffe mapper). MethylCall, MergeCpG, and ConversionRate consume that GAF."
+    },
+    {
+      "title": "Pixi checkout and jammy runtime",
+      "description": "pixi install provides the Mojo toolchain. Release 0.1.0-jammy is goliath-align-host-linux-amd64-jammy.tar.gz, an Ubuntu 22.04 amd64 tree with bin/methylGrapher and a bundled mojo."
+    }
+  ],
+  "links": {
+    "repository": "https://github.com/Goliath-Research/GoliathAlign",
+    "docs": null,
+    "website": null
+  },
+  "related": [],
+  "dependsOn": [],
+  "license": "MIT",
+  "status": "alpha"
+}

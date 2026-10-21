@@ -1,59 +1,40 @@
-# ROCm Mojo Giraffe gates (AMD Instinct)
+# AMD Mojo Giraffe device
 
 > **Repository:** GoliathAlign (formerly `mojo-align`). `GOLIATH_ALIGN_*` is the environment family. `MOJO_ALIGN_*` and `/opt/mojo-align` remain one-cycle aliases of `GOLIATH_ALIGN_*` and `/opt/goliath-align`.
 
-Companion to the GoliathOmics multi-GPU align notes. Build from the GoliathOmics checkout (sibling of this repo).
-
-## Image
+`MojoGiraffe -device amd` uses the same `DeviceContext` sources as `-device nvidia` (`gpu-common` and `giraffe_gpu_map_kernels`). The kernel label is `amdgpu:gfx942` unless `METHYLGRAPHER_AMDGPU_ARCH` is set, in which case the label is `amdgpu:` plus that value. The API string is `hip`.
 
 ```bash
-# From GoliathOmics (stages this repo into workers/docker/methylgrapher)
-GOLIATH_ALIGN_GPU_VARIANT=rocm \
-GOLIATH_ALIGN_IMAGE_TAG=1.70-mojo-rocm \
-  bash scripts/build_goliath_align_image.sh
-
-# CUDA twin (Lambda / NGC hosts)
-GOLIATH_ALIGN_GPU_VARIANT=cuda \
-GOLIATH_ALIGN_IMAGE_TAG=1.70-mojo-cuda \
-  bash scripts/build_goliath_align_image.sh
+METHYLGRAPHER_ENGINE=mojo \
+METHYLGRAPHER_TARGET_ACCELERATOR=amdgpu:gfx942 \
+  ./bin/methylGrapher MojoGiraffe \
+  -gfa graph.gfa -fq1 R1.fastq -out_gaf out.gaf -device amd
 ```
 
-Alias `:1.70-mojo` may point at the CUDA build for backward compatibility.
+The GBZ stream map prints `target=` from `kernel_target_label`. On AMD that string is `amdgpu:gfx942` or `amdgpu:$METHYLGRAPHER_AMDGPU_ARCH`.
 
-Site pin:
+## Host tools the probe uses
 
-```json
-"actionConfig": {
-  "methylgrapher_wgbs": {
-    "engine": "mojo",
-    "align_engine": "gpu_giraffe",
-    "giraffe_device": "auto",
-    "align_device": "auto",
-    "image": "goliath/methylgrapher:1.70-mojo-rocm"
-  }
-}
-```
+- `rocm-smi --showproductname` and, if that fails, `rocminfo`, when `-device auto` is choosing a device
+- A HIP `DeviceContext`. `METHYLGRAPHER_GPU_REQUIRE` empty or `1` fails the run when that context cannot be created
 
-## Host prerequisites
-
-- ROCm driver + `rocm-smi`
-- Container runtime with AMD GPU device access (ROCm container toolkit / `--device=/dev/kfd --device=/dev/dri`)
-- Shared NFS: genomes, `/work/cache/mojo_segments`, sample dirs
-
-## Measurement gates
+## Measurement record
 
 | Gate | How | Status |
 |------|-----|--------|
-| Device probe | `docker run --rm … methylGrapher MojoGiraffe … -device amd` logs `kernel_target=amdgpu` (or `amdgpu:gfx942`) | image smoke |
-| Toy GBZ PE | Same golden as NVIDIA (`docs/BENCHMARK_GIRAFFE.md`) | operator |
-| Known-mapped Buffy C2T | 13/13 style fixture | operator |
-| Full Buffy wall | ≤ target vs GH200 baseline (~2 h goal) | **PENDING** MI300X bakeoff |
-| Parity | DS20M / subset `graph.methyl` vs NVIDIA Mojo (and optional `cpu_vg`) | **PENDING** |
+| Device probe | MojoGiraffe `-device amd` prints `target=amdgpu:gfx942` (or `amdgpu:` plus `METHYLGRAPHER_AMDGPU_ARCH`) | operator, on a machine with HIP |
+| Toy GBZ PE | Same golden as `BENCHMARK_GIRAFFE.md` | operator |
+| Full-depth dual-map wall | Operator timing on an Instinct GPU | **PENDING** |
 
-Same Mojo DeviceContext sources as NVIDIA (`gpu-common` + `giraffe_gpu_map_kernels`). No HIP rewrite. Clara remains NVIDIA-only (explicit linear/stock path).
+## Selecting another mapper
 
-**Build note (2026-08-14):** `:1.70-mojo-rocm` image builds from GoliathAlign on GH200 hosts; `smoke_64k.sh` CUDA/cupy probe is skipped/irrelevant on ROCm — use `-device amd` on MI300X for the DeviceContext gate. Instinct Buffy wall remains **PENDING** bakeoff.
+```bash
+export METHYLGRAPHER_ALIGN_ENGINE=cpu_vg
+# or
+export METHYLGRAPHER_GPU_GIRAFFE_FALLBACK=vg
+# or
+export GOLIATH_ALIGN_GIRAFFE_READY=0
+export METHYLGRAPHER_GIRAFFE_DEVICE=cpu
+```
 
-## Rollback
-
-`giraffe_device=cpu` or `gpu_giraffe_fallback=vg` or stock `:1.70` + `engine=python`.
+`METHYLGRAPHER_MCALL_ENGINE=python` runs `Align` / `MethylCall` through `engine.cli`.

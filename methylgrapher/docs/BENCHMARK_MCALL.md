@@ -29,6 +29,6 @@ Native path: Mojo `Dict` GFA + `alignment_to_methylation` + `parallelize()`; GAF
 
 Parity: `graph.methyl` identical vs python engine on this subset (16 993 rows) — `scripts/parity_compare.py --skip-cpg`.
 
-### Full Buffy sample
+### Full sample
 
-`/work/samples/HBCST-052125-87293/methylgrapher_work/alignment.gaf` is ~679 GiB. Full-sample wall/RSS should be re-measured by operators after deploying `:1.70-mojo`; expect a larger relative win once GFA load is amortized over billions of GAF lines. Keep `engine: python` / `:1.70` as one-release rollback.
+A full Buffy-depth `alignment.gaf` used for this note was about 679 GiB (`/work/samples/HBCST-052125-87293/methylgrapher_work/alignment.gaf`). Re-measure wall time and RSS on a full file; the 20k-line subset is dominated by GFA load. `METHYLGRAPHER_MCALL_ENGINE=python`, or a checkout launcher with `METHYLGRAPHER_ENGINE` unset, runs MethylCall through `engine.cli`.
