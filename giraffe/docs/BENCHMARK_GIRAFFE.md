@@ -96,16 +96,16 @@ python scripts/build_mojo_segment_pack.py \
 | NVIDIA GH200 | `nvidia:sm_90` DeviceContext | PASS | CuPy / host-nvidia fallback **refused** on stream map |
 | AMD Instinct | `amdgpu:gfx942` (MI300X) / HIP | bakeoff **PENDING** | See `docs/ROCM_GIRAFFE_GATES.md`; set `METHYLGRAPHER_AMDGPU_ARCH` if needed. Same Mojo DeviceContext sources as NVIDIA — no second kernel dialect. Buffy wall twin of GH200 when MI300X available. |
 
-## Comparison arms (vg retained)
+## `cpu_vg` and `mojo_giraffe`
 
-`align_engine=cpu_vg` (`vg giraffe`) remains a first-class **before** arm (`align.pangenome_wgbs.vg`). MojoGiraffe is preferred science for production WGBS procedures; do **not** retire `cpu_vg` or flip fleet defaults solely from this bakeoff. MethylPipeline matrix: `docs/architecture/sample-prep-tooling.md` / plan `comparison-arms-bakeoff`.
+Unset `-align_engine` / `METHYLGRAPHER_ALIGN_ENGINE` selects `cpu_vg` (`vg giraffe` GAF with named coordinates). Set `mojo_giraffe` or `gpu_giraffe` to run `MojoGiraffe`. The wall-clock table below is an operator record; it does not change that default.
 
 | Gate (2026-08-15) | Criterion | Status |
 |-------------------|-----------|--------|
-| vg vs Mojo dual-map wall | Report hours on agreed subset; ≤2h aspirational | **NOT MET** — ~75–90k pairs/s after kernel pass; see stage table above |
-| Named-coordinate GAF science | MethylCall path for both arms | Available via engine overlay |
-| Multi-GPU dual-parallel | `METHYLGRAPHER_DUAL_GRAPH_PARALLEL=1` or `auto` with ≥2 GPUs; one process per GPU | Documented; this host has 1× GH200 → serial |
-| Production site / library default flip | — | **Not done** (by design; keep `cpu_vg`) |
+| vg vs Mojo dual-map wall | Report hours on an agreed subset; two-hour figure is the operator target | **NOT MET** — ~75–90k pairs/s after the kernel pass; see the stage table above |
+| Named-coordinate GAF | `MethylCall` reads `alignment.gaf` from either mapper | Implemented |
+| Multi-GPU dual-parallel | `METHYLGRAPHER_DUAL_GRAPH_PARALLEL=1` or `auto` with at least two GPUs; one process per GPU | Documented; the host that produced this note had one GH200, so the graphs ran serially |
+| Default engine | `cpu_vg` unless `METHYLGRAPHER_ALIGN_ENGINE` or `-align_engine` says otherwise | Code default |
 
 ## Rollback
 

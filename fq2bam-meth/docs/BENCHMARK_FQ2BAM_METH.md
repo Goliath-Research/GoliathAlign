@@ -6,11 +6,17 @@ Science contract: directional PE → BAM + QC. See [`LINEAR_FQ2BAM_SPEC.md`](LIN
 
 ## Toy fixture
 
+From the repository root (`samtools` on `PATH`). `fq2bam-meth/scripts/run_toy_fq2bam_meth.sh` and `benchmark_fq2bam_meth.sh` look for `bin/methylGrapher` next to `scripts/`, which is the flat tree from `scripts/stage_flat_image_tree.sh`.
+
 ```bash
-scripts/run_toy_fq2bam_meth.sh python cpu
-scripts/benchmark_fq2bam_meth.sh
-# Clara bakeoff (Mojo wall strictly < Clara; fail-closed GPU):
-scripts/benchmark_clara_fq2bam_meth.sh [R1] [R2] [REF] nvidia
+./bin/methylGrapher MojoFq2bamMeth \
+  -fq1 fq2bam-meth/tests/data/fq2bam_fixture/R1.fastq \
+  -fq2 fq2bam-meth/tests/data/fq2bam_fixture/R2.fastq \
+  -ref fq2bam-meth/tests/data/fq2bam_fixture/ref.fa \
+  -out_bam /tmp/toy.bam -out_qc_dir /tmp/toy_qc -sample_id toy \
+  -device cpu -k 8 -t 2
+# Clara wall clock beside Mojo (GPU require on; pbrun or the image inside the script):
+fq2bam-meth/scripts/benchmark_clara_fq2bam_meth.sh [R1] [R2] [REF] nvidia
 ```
 
 ## Parabricks sample parity (`align.linear.parabricks` vs `align.linear.mojo`)
@@ -58,29 +64,17 @@ Harness: [`scripts/benchmark_clara_fq2bam_meth.sh`](../scripts/benchmark_clara_f
 | AMD MI300X twin | Mojo AMD wall ≈ NVIDIA Mojo twin; ≫ BWA CPU | **PENDING** ROCm bakeoff |
 | Complete status | both wall-clock gates green | **PENDING** (default mapper is already `mojo`) |
 
-**Site defaults:** do **not** flip production `actionConfig.parabricks.engine` based on this table alone. Clara remains a first-class before-arm (`align.linear.parabricks`) for before/after bakeoffs — see MethylPipeline `docs/architecture/sample-prep-tooling.md` and `docs/plans/comparison-arms-bakeoff.plan.md`.
-
-Record operator runs:
+Record operator runs from the repository root:
 
 ```bash
-scripts/benchmark_clara_fq2bam_meth.sh /path/to/R1.fastq.gz /path/to/R2.fastq.gz /path/to/ref.fa nvidia
-scripts/benchmark_fq2bam_meth.sh /path/to/R1.fastq.gz /path/to/R2.fastq.gz /path/to/ref.fa
+fq2bam-meth/scripts/benchmark_clara_fq2bam_meth.sh /path/to/R1.fastq.gz /path/to/R2.fastq.gz /path/to/ref.fa nvidia
 fq2bam-meth/scripts/parity_linear_parabricks_vs_mojo.sh --device nvidia
 ```
 
-MethylPipeline report staging (after arms exist):
+`benchmark_fq2bam_meth.sh` resolves `bin/methylGrapher` as the parent of `scripts/` (the flat tree). On this checkout, call `./bin/methylGrapher MojoFq2bamMeth` as in the toy section.
 
-```bash
-.venv/bin/python scripts/comparison_arms_report.py \
-  --sample-id <id> --ensure-arms \
-  --arm-metric 'align.linear.parabricks:status=operator,wall_s=<clara>' \
-  --arm-metric 'align.linear.mojo:status=operator,wall_s=<mojo>' \
-  --note 'Clara retained for comparison; no site-default flip'
-```
-
-## Rollback
+## BWA-MEM mapper
 
 ```bash
 export METHYLGRAPHER_LINEAR_MAPPER=bwa
-# Or MethylPipeline: actionConfig.parabricks.engine=parabricks
 ```

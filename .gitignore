@@ -16,6 +16,9 @@ build/
 .idea/
 .vscode/
 
+# MkDocs build output (CI builds the site and does not publish it)
+site/
+
 # Runtime outputs
 tests/data/work_dir/*.methyl
 tests/data/work_dir/*.cpg.tsv

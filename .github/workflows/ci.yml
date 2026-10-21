@@ -68,3 +68,33 @@ jobs:
           test -f _flat_image/engine/cli.py
           test -f _flat_image/src/linear_mapper.mojo
           test -f _flat_image/src/gpu_kernels.mojo
+
+  product-summary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Validate .goliath/product.json
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check 'check-jsonschema>=0.28,<1'
+          check-jsonschema --schemafile .goliath/product.schema.json .goliath/product.json
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Build the MkDocs site
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check 'mkdocs>=1.6,<2' 'mkdocs-material>=9.5,<10'
+          mkdocs build --strict

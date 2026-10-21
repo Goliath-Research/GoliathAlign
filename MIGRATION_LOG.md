@@ -8,15 +8,9 @@ earlier TODOs when they conflict.
 
 ## 2026-09-28 — Repository rename to GoliathAlign
 
-The local checkout directory is **GoliathAlign**. `GOLIATH_ALIGN_*` and `/opt/goliath-align` are canonical. `MOJO_ALIGN_*` and `/opt/mojo-align` remain one-cycle aliases. The `methylGrapher` CLI and algorithm package directories are unchanged.
+The GitHub repository is `https://github.com/Goliath-Research/GoliathAlign`. `GOLIATH_ALIGN_*` and `/opt/goliath-align` are the names the runtime reads first. `MOJO_ALIGN_*`, `METHYLGRAPHER_MOJO_*`, `/opt/mojo-align`, and `/opt/methylgrapher-mojo` still resolve, with a deprecation warning. The `methylGrapher` command and the package directories are unchanged.
 
-The Git remote is still `https://github.com/Goliath-Research/mojo-align.git`. Rename it on GitHub from a machine that has `gh` logged in:
-
-```bash
-gh repo rename GoliathAlign --repo Goliath-Research/mojo-align
-```
-
-GitHub then redirects the old URL. Point `origin` at `https://github.com/Goliath-Research/GoliathAlign.git` after that rename.
+This entry originally said the remote was still `Goliath-Research/mojo-align` and gave a `gh repo rename` command. That rename has landed.
 
 ---
 
@@ -365,10 +359,5 @@ replaced; see its "Known TODOs" for the current plan).
 vs Docker `goliath/methylgrapher:1.70` (stock 0.2.0). See
 `docs/BENCHMARK_MCALL.md`.
 
-**Dual-ship (MethylPipeline):**
-- `actionConfig.methylgrapher_wgbs.engine` = `python`|`mojo`
-- Image `goliath/methylgrapher:1.70-mojo` built via
-  `scripts/build_mojo_align_image.sh`; smoke passed on 64K pages.
-- Default remains `python` until cutover gate
-  (`docs/plans/methylgrapher-mojo-cutover-gate.md`).
+**Engine switch in this tree:** unset `METHYLGRAPHER_ENGINE` runs `python -m engine.cli`. `METHYLGRAPHER_ENGINE=mojo` runs `methylgrapher/src/main.mojo`. `METHYLGRAPHER_MCALL_ENGINE=python` sends Align, MethylCall, MergeCpG, and ConversionRate back to `engine.cli`.
 

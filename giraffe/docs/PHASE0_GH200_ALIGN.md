@@ -21,11 +21,10 @@ Can **GPU Giraffe** (Parabricks `pbrun giraffe`) map BS-converted reads to d9-bs
 
 Conclusion: Parabricks accelerates stock pangenome BAM, but **cannot** satisfy methylGrapher’s dual-graph **GAF** contract on 4.7.0-1.
 
-## Escalation (per plan)
+## What this repo maps with
 
-1. **Mojo Giraffe (science GAF):** `MojoGiraffe` CLI + portable GPU seed (`nvidia:sm_90`). Backend `gpu_giraffe` defaults to `FALLBACK=mojo` and prefers **GBZ quartet** (`-gbz/-dist/-min/-zipcodes`) via staged segment cache — **no GFA size-cap** on the production path. Emergency: `FALLBACK=vg` or `align_engine=cpu_vg`.
-2. **Parabricks GAF:** still blocked on NVIDIA adding GAF/`named-coordinates` (this Phase 0 NO-GO remains).
-3. **Do not** flip site `align_engine=gpu_giraffe` as “Parabricks GAF” or “Buffy ≤2 h done” until operator gates in MethylPipeline `docs/plans/mojo-giraffe-cutover-gate.md` pass.
+1. **Mojo Giraffe (science GAF):** `MojoGiraffe` CLI + portable GPU seed (`nvidia:sm_90`). Backend `gpu_giraffe` defaults to `FALLBACK=mojo` and prefers a **GBZ quartet** (`-gbz/-dist/-min/-zipcodes`) via the staged segment cache. The GBZ path has no GFA size cap. `METHYLGRAPHER_GPU_GIRAFFE_FALLBACK=vg` or `-align_engine cpu_vg` selects `vg giraffe`.
+2. **Parabricks GAF:** `pbrun giraffe` on 4.7.0-1 remains BAM-only, so it does not satisfy the GAF contract above.
 
 ## Timing probes
 
@@ -37,11 +36,6 @@ Run [`scripts/spike_gh200_dual_graph_align.sh`](../scripts/spike_gh200_dual_grap
 
 Full-depth Buffy dual-map wall (~2 h gate) remains an operator measurement after Mojo Align lands; CPU vg alone was ~4 h for **one** QC giraffe on this cohort historically.
 
-## Go criteria for flipping site default
+## When a Parabricks giraffe BAM could stand in for this GAF
 
-Re-open Phase 0 when **any** of:
-
-- Parabricks (or successor) emits GAF + named-coordinates parity vs `vg giraffe -o gaf --named-coordinates`, or
-- Native Mojo/CUDA Giraffe reaches science parity,
-
-**and** dual-map + merge wall ≤ ~2 h on full Buffy on GH200.
+Re-open the probe when Parabricks emits GAF with named-coordinates parity against `vg giraffe -o gaf --named-coordinates`, and a dual-map plus merge finishes in about two hours on a full Buffy-depth run on GH200. Until then, graph methylation in this tree reads `alignment.gaf` from `Align` or `MojoGiraffe`.

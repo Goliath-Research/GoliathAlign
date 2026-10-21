@@ -69,17 +69,6 @@ If the dense pack is missing, the first worker builds it on the fly under an
 exclusive flock on `${cache}.lock` (other workers wait, then reuse). Disable
 with `METHYLGRAPHER_LINEAR_CACHE_BUILD=0`.
 
-After the dense-v1 pack is complete, upload the linear pin (includes Mojo
-siblings under the same prefix) with the existing genomes sync:
-
-```bash
-MethylPipeline/scripts/sync_genomes_to_s3.sh --only linear/GRCh38/ensembl-114
-```
-
-Phase 0 `provision_selected_genomes.sh` / recipe `s3_sync` of
-`linear/GRCh38/ensembl-114/` already downloads that whole tree to `/work`.
-See [`reference-inventory-qnap.md`](../../../MethylPipeline/docs/deployment/reference-inventory-qnap.md).
-
 ## Run both arms + score
 
 ```bash
@@ -104,9 +93,9 @@ Clara runs via host `pbrun` when available, otherwise Docker
 | `mapped_rate` | \|Δ\| ≤ 0.02 | `samtools flagstat` mapped / total |
 | `idxstats_spearman` | ≥ 0.95 | Primary contigs (1–22, X, Y, MT) mapped-count Spearman |
 
-Aligned with MethylPipeline [`mojo-fq2bam-concordance-gates.md`](../../../MethylPipeline/docs/plans/mojo-fq2bam-concordance-gates.md).
+Those defaults are `--max-delta` and `--min-idxstats-spearman` on `fq2bam-meth/scripts/compare_linear_align_parity.py`.
 
-## GATK 4 / Picard metrics (consumer parity)
+## GATK 4 / Picard metrics
 
 Clara `fq2bam_meth` is positioned as GATK 4–compatible. Mojo must clear the
 same consumer checks before cutover:
