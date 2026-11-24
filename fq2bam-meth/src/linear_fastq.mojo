@@ -6,7 +6,7 @@
 
 from std.collections import List
 from std.ffi import external_call
-from std.memory import UnsafePointer, unsafe_memcpy, unsafe_memmove, unsafe_memset
+from std.memory import Pointer, unsafe_memcpy, unsafe_memmove, unsafe_memset
 from std.python import Python, PythonObject
 
 
@@ -14,16 +14,16 @@ comptime FQ_PIPE_BUF = 8 * 1024 * 1024
 comptime FQ_ARENA_MIN = 4 * 1024 * 1024
 
 
-def _fq_u8(addr: Int) -> UnsafePointer[UInt8, MutAnyOrigin]:
-    return UnsafePointer[UInt8, MutAnyOrigin](unsafe_from_address=addr)
+def _fq_u8(addr: Int) -> Pointer[UInt8, MutAnyOrigin]:
+    return Pointer[UInt8, MutAnyOrigin](unsafe_from_address=addr)
 
 
-def _fq_u32(addr: Int) -> UnsafePointer[UInt32, MutAnyOrigin]:
-    return UnsafePointer[UInt32, MutAnyOrigin](unsafe_from_address=addr)
+def _fq_u32(addr: Int) -> Pointer[UInt32, MutAnyOrigin]:
+    return Pointer[UInt32, MutAnyOrigin](unsafe_from_address=addr)
 
 
-def _fq_u64(addr: Int) -> UnsafePointer[UInt64, MutAnyOrigin]:
-    return UnsafePointer[UInt64, MutAnyOrigin](unsafe_from_address=addr)
+def _fq_u64(addr: Int) -> Pointer[UInt64, MutAnyOrigin]:
+    return Pointer[UInt64, MutAnyOrigin](unsafe_from_address=addr)
 
 
 def _bs_mode(mode: String) -> Int:
@@ -299,7 +299,7 @@ def _arena_push_raw(
             var src = _fq_u8(src_addr)
             var i = 0
             while i < n:
-                dst[i] = _cvt(src[i], convert)
+                dst[unsafe_offset=i] = _cvt(src[unsafe_offset=i], convert)
                 i += 1
     a.used = a.used + n
     return off
@@ -308,11 +308,11 @@ def _arena_push_raw(
 def _qname_span(buf_addr: Int, n: Int, mut start: Int, mut ln: Int):
     var s = 0
     var e = n
-    if e > 0 and Int(_fq_u8(buf_addr)[0]) == 64:
+    if e > 0 and Int(_fq_u8(buf_addr)[unsafe_offset=0]) == 64:
         s = 1
     var i = s
     while i < e:
-        var c = Int(_fq_u8(buf_addr)[i])
+        var c = Int(_fq_u8(buf_addr)[unsafe_offset=i])
         if c == 32 or c == 47:
             e = i
             break
@@ -470,7 +470,7 @@ def fq_pack_bases(
     var i = 0
     while i < n1:
         var ln = a.seq1_len[i]
-        lens[i] = UInt32(ln)
+        lens[unsafe_offset=i] = UInt32(ln)
         if ln > 0:
             unsafe_memcpy(
                 dest=_fq_u8(dest_addr + i * max_len),
@@ -482,7 +482,7 @@ def fq_pack_bases(
         i = 0
         while i < n1:
             var ln2 = a.seq2_len[i]
-            lens[n1 + i] = UInt32(ln2)
+            lens[unsafe_offset=n1 + i] = UInt32(ln2)
             if ln2 > 0:
                 unsafe_memcpy(
                     dest=_fq_u8(dest_addr + (n1 + i) * max_len),
@@ -507,11 +507,11 @@ def _fill_offs(
     var i = 0
     while i < n:
         var ln = lens[i]
-        out_n[i] = UInt32(ln)
+        out_n[unsafe_offset=i] = UInt32(ln)
         if ln > 0:
-            addrs[i] = UInt64(base + offs[i])
+            addrs[unsafe_offset=i] = UInt64(base + offs[i])
         else:
-            addrs[i] = UInt64(0)
+            addrs[unsafe_offset=i] = UInt64(0)
         i += 1
 
 

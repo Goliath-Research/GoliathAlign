@@ -7,7 +7,7 @@
 
 from max.algorithm import parallelize
 from std.collections import Dict, List
-from std.memory import UnsafePointer, unsafe_memcpy
+from std.memory import Pointer, unsafe_memcpy
 from std.python import Python, PythonObject
 from std.sys import has_accelerator
 from std.time import perf_counter as _tick
@@ -200,24 +200,24 @@ def _gather_perm_to_writer(
     var gi = 0
     var bp_out = _u8_at(bam_blob_addr)
     while gi < n:
-        var orig = Int(h_perm[gi])
-        var packed = h_rec[orig]
+        var orig = Int(h_perm[unsafe_offset=gi])
+        var packed = h_rec[unsafe_offset=orig]
         var cid = Int(packed >> 32)
         var loc = Int(packed & 4294967295)
-        var rlen = Int(h_len[orig])
+        var rlen = Int(h_len[unsafe_offset=orig])
         if gout + rlen > bam_cap:
             writer.write_raw(bam_blob_addr, gout)
             gout = 0
         if rlen > bam_cap:
             raise Error("BAM record larger than batch buffer")
-        var src = UnsafePointer[UInt8, MutAnyOrigin](
+        var src = Pointer[UInt8, MutAnyOrigin](
             unsafe_from_address=chunk_addrs[cid] + loc
         )
-        var dst = UnsafePointer[UInt8, MutAnyOrigin](
+        var dst = Pointer[UInt8, MutAnyOrigin](
             unsafe_from_address=bam_blob_addr + gout
         )
         unsafe_memcpy(dest=dst, src=src, count=rlen)
-        if apply_dup and Int(h_dup[orig]) != 0:
+        if apply_dup and Int(h_dup[unsafe_offset=orig]) != 0:
             _or_dup_flag(bp_out, gout)
         gout += rlen
         gi += 1
@@ -346,20 +346,20 @@ def _maybe_flush_tile(
     tile_chunks = 0
 
 
-def _u8_at(addr: Int) -> UnsafePointer[UInt8, MutAnyOrigin]:
-    return UnsafePointer[UInt8, MutAnyOrigin](unsafe_from_address=addr)
+def _u8_at(addr: Int) -> Pointer[UInt8, MutAnyOrigin]:
+    return Pointer[UInt8, MutAnyOrigin](unsafe_from_address=addr)
 
 
-def _i32_at(addr: Int) -> UnsafePointer[Int32, MutAnyOrigin]:
-    return UnsafePointer[Int32, MutAnyOrigin](unsafe_from_address=addr)
+def _i32_at(addr: Int) -> Pointer[Int32, MutAnyOrigin]:
+    return Pointer[Int32, MutAnyOrigin](unsafe_from_address=addr)
 
 
-def _u32_at(addr: Int) -> UnsafePointer[UInt32, MutAnyOrigin]:
-    return UnsafePointer[UInt32, MutAnyOrigin](unsafe_from_address=addr)
+def _u32_at(addr: Int) -> Pointer[UInt32, MutAnyOrigin]:
+    return Pointer[UInt32, MutAnyOrigin](unsafe_from_address=addr)
 
 
-def _u64_at(addr: Int) -> UnsafePointer[UInt64, MutAnyOrigin]:
-    return UnsafePointer[UInt64, MutAnyOrigin](unsafe_from_address=addr)
+def _u64_at(addr: Int) -> Pointer[UInt64, MutAnyOrigin]:
+    return Pointer[UInt64, MutAnyOrigin](unsafe_from_address=addr)
 
 
 def _copy_bytes(dst: Int, src: Int, nbytes: Int):
@@ -405,19 +405,19 @@ def _pack_end(tid: Int, u5: Int, strand: Int) -> UInt64:
     return (UInt64(t) << 48) | (UInt64(strand & 1) << 47) | (UInt64(u) & 140737488355327)
 
 
-def _or_dup_flag(p: UnsafePointer[UInt8, MutAnyOrigin], rec_off: Int):
-    var b0 = Int(p[rec_off + 16])
-    var b1 = Int(p[rec_off + 17])
-    var b2 = Int(p[rec_off + 18])
-    var b3 = Int(p[rec_off + 19])
+def _or_dup_flag(p: Pointer[UInt8, MutAnyOrigin], rec_off: Int):
+    var b0 = Int(p[unsafe_offset=rec_off + 16])
+    var b1 = Int(p[unsafe_offset=rec_off + 17])
+    var b2 = Int(p[unsafe_offset=rec_off + 18])
+    var b3 = Int(p[unsafe_offset=rec_off + 19])
     var flag_nc = b0 | (b1 << 8) | (b2 << 16) | (b3 << 24)
     var flag = (flag_nc >> 16) | 1024
     var nc = flag_nc & 65535
     var v = (flag << 16) | nc
-    p[rec_off + 16] = UInt8(v & 255)
-    p[rec_off + 17] = UInt8((v >> 8) & 255)
-    p[rec_off + 18] = UInt8((v >> 16) & 255)
-    p[rec_off + 19] = UInt8((v >> 24) & 255)
+    p[unsafe_offset=rec_off + 16] = UInt8(v & 255)
+    p[unsafe_offset=rec_off + 17] = UInt8((v >> 8) & 255)
+    p[unsafe_offset=rec_off + 18] = UInt8((v >> 16) & 255)
+    p[unsafe_offset=rec_off + 19] = UInt8((v >> 24) & 255)
 
 
 def _rid_to_tid_table(index: FmIndex) raises -> List[Int]:
@@ -435,21 +435,21 @@ def _rid_to_tid_table(index: FmIndex) raises -> List[Int]:
     return out^
 
 
-def _put_i32(p: UnsafePointer[UInt8, MutAnyOrigin], off: Int, v: Int):
+def _put_i32(p: Pointer[UInt8, MutAnyOrigin], off: Int, v: Int):
     var u = v
     if u < 0:
         u = u + 4294967296
-    p[off] = UInt8(u & 255)
-    p[off + 1] = UInt8((u >> 8) & 255)
-    p[off + 2] = UInt8((u >> 16) & 255)
-    p[off + 3] = UInt8((u >> 24) & 255)
+    p[unsafe_offset=off] = UInt8(u & 255)
+    p[unsafe_offset=off + 1] = UInt8((u >> 8) & 255)
+    p[unsafe_offset=off + 2] = UInt8((u >> 16) & 255)
+    p[unsafe_offset=off + 3] = UInt8((u >> 24) & 255)
 
 
-def _put_u32(p: UnsafePointer[UInt8, MutAnyOrigin], off: Int, v: UInt32):
-    p[off] = UInt8(Int(v) & 255)
-    p[off + 1] = UInt8(Int(v >> 8) & 255)
-    p[off + 2] = UInt8(Int(v >> 16) & 255)
-    p[off + 3] = UInt8(Int(v >> 24) & 255)
+def _put_u32(p: Pointer[UInt8, MutAnyOrigin], off: Int, v: UInt32):
+    p[unsafe_offset=off] = UInt8(Int(v) & 255)
+    p[unsafe_offset=off + 1] = UInt8(Int(v >> 8) & 255)
+    p[unsafe_offset=off + 2] = UInt8(Int(v >> 16) & 255)
+    p[unsafe_offset=off + 3] = UInt8(Int(v >> 24) & 255)
 
 
 def _nt16(b: UInt8) -> UInt8:
@@ -495,7 +495,7 @@ def _reg2bin(beg: Int, end: Int) -> Int:
 
 
 def _pack_bam_aln(
-    p: UnsafePointer[UInt8, MutAnyOrigin],
+    p: Pointer[UInt8, MutAnyOrigin],
     off0: Int,
     cap: Int,
     name_addr: Int,
@@ -587,9 +587,9 @@ def _pack_bam_aln(
     var off = off0 + 36
     var ni = 0
     while ni < name_len:
-        p[off + ni] = name[ni]
+        p[unsafe_offset=off + ni] = name[unsafe_offset=ni]
         ni += 1
-    p[off + ni] = 0
+    p[unsafe_offset=off + ni] = 0
     off += l_qname
     if n_cigar > 0:
         if slv > 0:
@@ -608,22 +608,22 @@ def _pack_bam_aln(
         if rev:
             ia = qlen - 1 - si
             ib = qlen - 2 - si
-        var a = _nt16(seq[ia])
-        var b = _nt16(seq[ib])
+        var a = _nt16(seq[unsafe_offset=ia])
+        var b = _nt16(seq[unsafe_offset=ib])
         if rev:
             a = _nt16_comp(a)
             b = _nt16_comp(b)
-        p[off] = (a << 4) | b
+        p[unsafe_offset=off] = (a << 4) | b
         off += 1
         si += 2
     if si < qlen:
         var ic = si
         if rev:
             ic = 0
-        var c = _nt16(seq[ic])
+        var c = _nt16(seq[unsafe_offset=ic])
         if rev:
             c = _nt16_comp(c)
-        p[off] = c << 4
+        p[unsafe_offset=off] = c << 4
         off += 1
     var qi2 = 0
     if qual_len == qlen and qual_addr != 0:
@@ -631,36 +631,36 @@ def _pack_bam_aln(
             var srcq = qi2
             if rev:
                 srcq = qlen - 1 - qi2
-            var qb2 = qual[srcq]
+            var qb2 = qual[unsafe_offset=srcq]
             if qb2 >= 33:
-                p[off + qi2] = qb2 - 33
+                p[unsafe_offset=off + qi2] = qb2 - 33
             else:
-                p[off + qi2] = 255
+                p[unsafe_offset=off + qi2] = 255
             qi2 += 1
     else:
         while qi2 < qlen:
-            p[off + qi2] = 255
+            p[unsafe_offset=off + qi2] = 255
             qi2 += 1
     off += qlen
-    p[off] = 82
-    p[off + 1] = 71
-    p[off + 2] = 90
+    p[unsafe_offset=off] = 82
+    p[unsafe_offset=off + 1] = 71
+    p[unsafe_offset=off + 2] = 90
     off += 3
     var ri = 0
     while ri < rg_n:
-        p[off + ri] = rg[ri]
+        p[unsafe_offset=off + ri] = rg[unsafe_offset=ri]
         ri += 1
-    p[off + rg_n] = 0
+    p[unsafe_offset=off + rg_n] = 0
     off += rg_n + 1
-    p[off] = 78
-    p[off + 1] = 77
-    p[off + 2] = 67
+    p[unsafe_offset=off] = 78
+    p[unsafe_offset=off + 1] = 77
+    p[unsafe_offset=off + 2] = 67
     var nmv = nm
     if nmv < 0:
         nmv = 0
     if nmv > 255:
         nmv = 255
-    p[off + 3] = UInt8(nmv)
+    p[unsafe_offset=off + 3] = UInt8(nmv)
     off += 4
     return off
 
@@ -689,10 +689,10 @@ def _emit_bam_from_batch(
     n2_orig_n: Int,
     n2_qual_a: Int,
     n2_qual_n: Int,
-    bam_p: UnsafePointer[UInt8, MutAnyOrigin],
+    bam_p: Pointer[UInt8, MutAnyOrigin],
     bam_cap: Int,
     rid_to_tid: List[Int],
-    rg_p: UnsafePointer[UInt8, ...],
+    rg_p: Pointer[UInt8, ...],
     rg_n: Int,
     coord_addr: Int,
     dhi_addr: Int,
@@ -753,21 +753,21 @@ def _emit_bam_from_batch(
     var off = 0
     var pj = 0
     while pj < n1:
-        var rid1 = Int(host_rid[pj])
-        var pos1 = Int(host_pos[pj])
-        var mq1 = Int(host_mapq[pj])
-        var fl1 = Int(host_flag[pj]) | 1 | 64
-        var sl1 = Int(host_sl[pj])
-        var sr1 = Int(host_sr[pj])
-        var nm1 = Int(host_nm[pj])
+        var rid1 = Int(host_rid[unsafe_offset=pj])
+        var pos1 = Int(host_pos[unsafe_offset=pj])
+        var mq1 = Int(host_mapq[unsafe_offset=pj])
+        var fl1 = Int(host_flag[unsafe_offset=pj]) | 1 | 64
+        var sl1 = Int(host_sl[unsafe_offset=pj])
+        var sr1 = Int(host_sr[unsafe_offset=pj])
+        var nm1 = Int(host_nm[unsafe_offset=pj])
         var tid1 = -1
         if rid1 >= 0 and rid1 < len(rid_to_tid):
             tid1 = rid_to_tid[rid1]
         else:
             fl1 = fl1 | 4
-        var qlen1 = Int(orig1_n[pj])
-        var q1n = Int(qual1_n[pj])
-        var n1len = Int(name1_n[pj])
+        var qlen1 = Int(orig1_n[unsafe_offset=pj])
+        var q1n = Int(qual1_n[unsafe_offset=pj])
+        var n1len = Int(name1_n[unsafe_offset=pj])
         if not paired:
             if n_reads >= meta_cap:
                 raise Error(
@@ -778,7 +778,7 @@ def _emit_bam_from_batch(
                 bam_p,
                 off,
                 bam_cap,
-                Int(name1_a[pj]),
+                Int(name1_a[unsafe_offset=pj]),
                 n1len,
                 fl1,
                 tid1,
@@ -786,9 +786,9 @@ def _emit_bam_from_batch(
                 mq1,
                 sl1,
                 sr1,
-                Int(orig1_a[pj]),
+                Int(orig1_a[unsafe_offset=pj]),
                 qlen1,
-                Int(qual1_a[pj]),
+                Int(qual1_a[unsafe_offset=pj]),
                 q1n,
                 -1,
                 -1,
@@ -797,39 +797,39 @@ def _emit_bam_from_batch(
                 rg_addr,
                 rg_n,
             )
-            h_coord[n_reads] = _coord_key(tid1, pos1, n_reads)
+            h_coord[unsafe_offset=n_reads] = _coord_key(tid1, pos1, n_reads)
             if tid1 >= 0:
-                h_dhi[n_reads] = _pack_end(
+                h_dhi[unsafe_offset=n_reads] = _pack_end(
                     tid1,
                     _unclipped5(fl1, pos1, sl1, sr1, qlen1),
                     (fl1 >> 4) & 1,
                 )
-                h_dlo[n_reads] = 0
+                h_dlo[unsafe_offset=n_reads] = 0
             else:
-                h_dhi[n_reads] = ~UInt64(0)
-                h_dlo[n_reads] = UInt64(n_reads)
-            h_rec[n_reads] = (UInt64(n_batches) << 32) | UInt64(rec_start)
-            h_len[n_reads] = UInt32(off - rec_start)
+                h_dhi[unsafe_offset=n_reads] = ~UInt64(0)
+                h_dlo[unsafe_offset=n_reads] = UInt64(n_reads)
+            h_rec[unsafe_offset=n_reads] = (UInt64(n_batches) << 32) | UInt64(rec_start)
+            h_len[unsafe_offset=n_reads] = UInt32(off - rec_start)
             var nm_c = nm1
             if nm_c < 0:
                 nm_c = 0
             if nm_c > 255:
                 nm_c = 255
-            h_score[n_reads] = UInt32((mq1 << 8) | (255 - nm_c))
+            h_score[unsafe_offset=n_reads] = UInt32((mq1 << 8) | (255 - nm_c))
             # Globally unique across tiles: n_reads resets on flush but n_total does not.
-            h_pair[n_reads] = UInt32(n_total + n_reads)
+            h_pair[unsafe_offset=n_reads] = UInt32(n_total + n_reads)
             if tid1 >= 0:
                 n_mapped += 1
             n_reads += 1
         else:
             var r2i = n1 + pj
-            var rid2 = Int(host_rid[r2i])
-            var pos2 = Int(host_pos[r2i])
-            var mq2 = Int(host_mapq[r2i])
-            var fl2 = Int(host_flag[r2i]) | 1 | 128
-            var sl2 = Int(host_sl[r2i])
-            var sr2 = Int(host_sr[r2i])
-            var nm2 = Int(host_nm[r2i])
+            var rid2 = Int(host_rid[unsafe_offset=r2i])
+            var pos2 = Int(host_pos[unsafe_offset=r2i])
+            var mq2 = Int(host_mapq[unsafe_offset=r2i])
+            var fl2 = Int(host_flag[unsafe_offset=r2i]) | 1 | 128
+            var sl2 = Int(host_sl[unsafe_offset=r2i])
+            var sr2 = Int(host_sr[unsafe_offset=r2i])
+            var nm2 = Int(host_nm[unsafe_offset=r2i])
             var tid2 = -1
             if rid2 >= 0 and rid2 < len(rid_to_tid):
                 tid2 = rid_to_tid[rid2]
@@ -845,7 +845,7 @@ def _emit_bam_from_batch(
             var npos2 = -1
             var tlen1 = 0
             var tlen2 = 0
-            var qlen2 = Int(orig2_n[pj])
+            var qlen2 = Int(orig2_n[unsafe_offset=pj])
             if tid1 >= 0 and tid2 >= 0 and tid1 == tid2:
                 fl1 = fl1 | 2
                 fl2 = fl2 | 2
@@ -870,8 +870,8 @@ def _emit_bam_from_batch(
                 if tid2 >= 0:
                     ntid1 = tid2
                     npos1 = pos2
-            var q2n = Int(qual2_n[pj])
-            var n2len = Int(name2_n[pj])
+            var q2n = Int(qual2_n[unsafe_offset=pj])
+            var n2len = Int(name2_n[unsafe_offset=pj])
             if n_reads + 1 >= meta_cap:
                 raise Error(
                     "FM sort cap exceeded; set METHYLGRAPHER_FM_SORT_CAP"
@@ -881,7 +881,7 @@ def _emit_bam_from_batch(
                 bam_p,
                 off,
                 bam_cap,
-                Int(name1_a[pj]),
+                Int(name1_a[unsafe_offset=pj]),
                 n1len,
                 fl1,
                 tid1,
@@ -889,9 +889,9 @@ def _emit_bam_from_batch(
                 mq1,
                 sl1,
                 sr1,
-                Int(orig1_a[pj]),
+                Int(orig1_a[unsafe_offset=pj]),
                 qlen1,
-                Int(qual1_a[pj]),
+                Int(qual1_a[unsafe_offset=pj]),
                 q1n,
                 ntid1,
                 npos1,
@@ -906,7 +906,7 @@ def _emit_bam_from_batch(
                 bam_p,
                 off,
                 bam_cap,
-                Int(name2_a[pj]),
+                Int(name2_a[unsafe_offset=pj]),
                 n2len,
                 fl2,
                 tid2,
@@ -914,9 +914,9 @@ def _emit_bam_from_batch(
                 mq2,
                 sl2,
                 sr2,
-                Int(orig2_a[pj]),
+                Int(orig2_a[unsafe_offset=pj]),
                 qlen2,
-                Int(qual2_a[pj]),
+                Int(qual2_a[unsafe_offset=pj]),
                 q2n,
                 ntid2,
                 npos2,
@@ -961,20 +961,20 @@ def _emit_bam_from_batch(
                 else:
                     dhi = e2
                     dlo = e1
-            h_coord[i1] = _coord_key(tid1, pos1, i1)
-            h_coord[i2] = _coord_key(tid2, pos2, i2)
-            h_dhi[i1] = dhi
-            h_dhi[i2] = dhi
-            h_dlo[i1] = dlo
-            h_dlo[i2] = dlo
-            h_rec[i1] = (UInt64(n_batches) << 32) | UInt64(rec_start1)
-            h_rec[i2] = (UInt64(n_batches) << 32) | UInt64(rec_start2)
-            h_len[i1] = UInt32(rec_len1)
-            h_len[i2] = UInt32(rec_len2)
-            h_score[i1] = pscore
-            h_score[i2] = pscore
-            h_pair[i1] = pid
-            h_pair[i2] = pid
+            h_coord[unsafe_offset=i1] = _coord_key(tid1, pos1, i1)
+            h_coord[unsafe_offset=i2] = _coord_key(tid2, pos2, i2)
+            h_dhi[unsafe_offset=i1] = dhi
+            h_dhi[unsafe_offset=i2] = dhi
+            h_dlo[unsafe_offset=i1] = dlo
+            h_dlo[unsafe_offset=i2] = dlo
+            h_rec[unsafe_offset=i1] = (UInt64(n_batches) << 32) | UInt64(rec_start1)
+            h_rec[unsafe_offset=i2] = (UInt64(n_batches) << 32) | UInt64(rec_start2)
+            h_len[unsafe_offset=i1] = UInt32(rec_len1)
+            h_len[unsafe_offset=i2] = UInt32(rec_len2)
+            h_score[unsafe_offset=i1] = pscore
+            h_score[unsafe_offset=i2] = pscore
+            h_pair[unsafe_offset=i1] = pid
+            h_pair[unsafe_offset=i2] = pid
             if tid1 >= 0:
                 n_mapped += 1
             if tid2 >= 0:
@@ -1070,21 +1070,21 @@ def map_fastq_fm_gpu(
             DeviceStream,
             HostBuffer,
         )
-        from std.memory import UnsafePointer, unsafe_memcpy
+        from std.memory import Pointer, unsafe_memcpy
 
         def copy_bytes_offset_kernel(
-            dst: UnsafePointer[UInt8, MutAnyOrigin],
-            src: UnsafePointer[UInt8, MutAnyOrigin],
+            dst: Pointer[UInt8, MutAnyOrigin],
+            src: Pointer[UInt8, MutAnyOrigin],
             dst_off: Int64,
             n: Int64,
         ):
             var tid = Int64(block_idx.x * block_dim.x + thread_idx.x)
             if tid < n:
-                dst[dst_off + tid] = src[tid]
+                dst[unsafe_offset=dst_off + tid] = src[unsafe_offset=tid]
 
         def upload_mmap_to_device[dst_origin: Origin](
             ctx: DeviceContext,
-            dst: UnsafePointer[UInt8, dst_origin],
+            dst: Pointer[UInt8, dst_origin],
             host_addr: Int,
             nbytes: Int,
             label: String,
@@ -1102,14 +1102,14 @@ def map_fastq_fm_gpu(
                 if n > CHUNK:
                     n = CHUNK
                 var host = ctx.enqueue_create_host_buffer[DType.uint8](n)
-                var src = UnsafePointer[UInt8, MutAnyOrigin](
+                var src = Pointer[UInt8, MutAnyOrigin](
                     unsafe_from_address=host_addr + off
                 )
                 unsafe_memcpy(dest=host.unsafe_ptr(), src=src, count=n)
                 var stage = ctx.enqueue_create_buffer[DType.uint8](n)
                 ctx.enqueue_copy(src_buf=host, dst_buf=stage)
                 var grid = (n + BLOCK - 1) // BLOCK
-                var dst_any = UnsafePointer[UInt8, MutAnyOrigin](
+                var dst_any = Pointer[UInt8, MutAnyOrigin](
                     unsafe_from_address=Int(dst)
                 )
                 ctx.enqueue_function[copy_bytes_offset_kernel](
@@ -1134,14 +1134,14 @@ def map_fastq_fm_gpu(
                     last_log = off
 
         def pack_bases_kernel(
-            bases: UnsafePointer[UInt8, MutAnyOrigin],
-            codes: UnsafePointer[UInt8, MutAnyOrigin],
+            bases: Pointer[UInt8, MutAnyOrigin],
+            codes: Pointer[UInt8, MutAnyOrigin],
             n: Int64,
         ):
             var idx = Int64(block_idx.x * block_dim.x + thread_idx.x)
             if idx >= n:
                 return
-            var b = bases[idx]
+            var b = bases[unsafe_offset=idx]
             var code: UInt8 = 255
             if b == 65 or b == 97:
                 code = 0
@@ -1151,14 +1151,14 @@ def map_fastq_fm_gpu(
                 code = 2
             elif b == 84 or b == 116:
                 code = 3
-            codes[idx] = code
+            codes[unsafe_offset=idx] = code
 
         def fm_seed_extend_kernel(
-            bwt: UnsafePointer[UInt32, MutAnyOrigin],
-            sa: UnsafePointer[UInt64, MutAnyOrigin],
-            pac: UnsafePointer[UInt8, MutAnyOrigin],
-            contig_off: UnsafePointer[UInt64, MutAnyOrigin],
-            contig_len: UnsafePointer[UInt32, MutAnyOrigin],
+            bwt: Pointer[UInt32, MutAnyOrigin],
+            sa: Pointer[UInt64, MutAnyOrigin],
+            pac: Pointer[UInt8, MutAnyOrigin],
+            contig_off: Pointer[UInt64, MutAnyOrigin],
+            contig_len: Pointer[UInt32, MutAnyOrigin],
             n_contigs: Int64,
             primary: UInt64,
             seq_len: UInt64,
@@ -1170,8 +1170,8 @@ def map_fastq_fm_gpu(
             l2_4: UInt64,
             sa_intv: Int64,
             n_sa: Int64,
-            codes: UnsafePointer[UInt8, MutAnyOrigin],
-            read_lens: UnsafePointer[UInt32, MutAnyOrigin],
+            codes: Pointer[UInt8, MutAnyOrigin],
+            read_lens: Pointer[UInt32, MutAnyOrigin],
             max_len: Int64,
             n_reads: Int64,
             seed_len: Int64,
@@ -1180,25 +1180,25 @@ def map_fastq_fm_gpu(
             max_diff: Int64,
             max_soft: Int64,
             max_adj: Int64,
-            out_rid: UnsafePointer[Int32, MutAnyOrigin],
-            out_pos: UnsafePointer[UInt32, MutAnyOrigin],
-            out_mapq: UnsafePointer[UInt32, MutAnyOrigin],
-            out_flag: UnsafePointer[Int32, MutAnyOrigin],
-            out_sl: UnsafePointer[UInt32, MutAnyOrigin],
-            out_sr: UnsafePointer[UInt32, MutAnyOrigin],
-            out_nm: UnsafePointer[UInt32, MutAnyOrigin],
+            out_rid: Pointer[Int32, MutAnyOrigin],
+            out_pos: Pointer[UInt32, MutAnyOrigin],
+            out_mapq: Pointer[UInt32, MutAnyOrigin],
+            out_flag: Pointer[Int32, MutAnyOrigin],
+            out_sl: Pointer[UInt32, MutAnyOrigin],
+            out_sr: Pointer[UInt32, MutAnyOrigin],
+            out_nm: Pointer[UInt32, MutAnyOrigin],
         ):
             var rid = Int64(block_idx.x * block_dim.x + thread_idx.x)
             if rid >= n_reads:
                 return
-            out_rid[rid] = Int32(-1)
-            out_pos[rid] = 0
-            out_mapq[rid] = 0
-            out_flag[rid] = Int32(4)
-            out_sl[rid] = 0
-            out_sr[rid] = 0
-            out_nm[rid] = 0
-            var qlen = Int64(read_lens[rid])
+            out_rid[unsafe_offset=rid] = Int32(-1)
+            out_pos[unsafe_offset=rid] = 0
+            out_mapq[unsafe_offset=rid] = 0
+            out_flag[unsafe_offset=rid] = Int32(4)
+            out_sl[unsafe_offset=rid] = 0
+            out_sr[unsafe_offset=rid] = 0
+            out_nm[unsafe_offset=rid] = 0
+            var qlen = Int64(read_lens[unsafe_offset=rid])
             if qlen < seed_len:
                 return
             var budget = max_diff
@@ -1243,7 +1243,7 @@ def map_fastq_fm_gpu(
                 var last_l: UInt64 = 0
                 var last_s = Int64(-1)
                 while s >= 0:
-                    var cc = Int64(codes[q_base + s])
+                    var cc = Int64(codes[unsafe_offset=q_base + s])
                     if cc > 3:
                         break
                     var ok: UInt64 = 0
@@ -1275,8 +1275,8 @@ def map_fastq_fm_gpu(
                             if kko >= primary:
                                 kko -= 1
                             var baseo = Int64((kko >> 7) << 4)
-                            nocc = UInt64(bwt[baseo + cc * 2]) | (
-                                UInt64(bwt[baseo + cc * 2 + 1]) << 32
+                            nocc = UInt64(bwt[unsafe_offset=baseo + cc * 2]) | (
+                                UInt64(bwt[unsafe_offset=baseo + cc * 2 + 1]) << 32
                             )
                             var po = baseo + 8
                             var endo = po + Int64(
@@ -1289,8 +1289,8 @@ def map_fastq_fm_gpu(
                                 )
                             )
                             while po < endo:
-                                var yo = (UInt64(bwt[po]) << 32) | UInt64(
-                                    bwt[po + 1]
+                                var yo = (UInt64(bwt[unsafe_offset=po]) << 32) | UInt64(
+                                    bwt[unsafe_offset=po + 1]
                                 )
                                 var ao: UInt64
                                 var bo: UInt64
@@ -1319,7 +1319,7 @@ def map_fastq_fm_gpu(
                             if bitso > 0 and bitso < 64:
                                 masko = ~((UInt64(1) << UInt64(bitso)) - 1)
                             var y5 = (
-                                (UInt64(bwt[po]) << 32) | UInt64(bwt[po + 1])
+                                (UInt64(bwt[unsafe_offset=po]) << 32) | UInt64(bwt[unsafe_offset=po + 1])
                             ) & masko
                             var a5: UInt64
                             var b6: UInt64
@@ -1401,7 +1401,7 @@ def map_fastq_fm_gpu(
                                 xpsi -= 1
                             var bi = Int64(xpsi)
                             var bidx = ((bi >> 7) << 4) + 8 + ((bi & 0x7F) >> 4)
-                            var w = bwt[bidx]
+                            var w = bwt[unsafe_offset=bidx]
                             var cc = Int64((w >> UInt32(((~bi) & 15) << 1)) & 3)
                             var kv = kk
 
@@ -1423,8 +1423,8 @@ def map_fastq_fm_gpu(
                                 if kko >= primary:
                                     kko -= 1
                                 var baseo = Int64((kko >> 7) << 4)
-                                nocc = UInt64(bwt[baseo + cc * 2]) | (
-                                    UInt64(bwt[baseo + cc * 2 + 1]) << 32
+                                nocc = UInt64(bwt[unsafe_offset=baseo + cc * 2]) | (
+                                    UInt64(bwt[unsafe_offset=baseo + cc * 2 + 1]) << 32
                                 )
                                 var po = baseo + 8
                                 var endo = po + Int64(
@@ -1437,8 +1437,8 @@ def map_fastq_fm_gpu(
                                     )
                                 )
                                 while po < endo:
-                                    var yo = (UInt64(bwt[po]) << 32) | UInt64(
-                                        bwt[po + 1]
+                                    var yo = (UInt64(bwt[unsafe_offset=po]) << 32) | UInt64(
+                                        bwt[unsafe_offset=po + 1]
                                     )
                                     var ao: UInt64
                                     var bo: UInt64
@@ -1467,7 +1467,7 @@ def map_fastq_fm_gpu(
                                 if bitso > 0 and bitso < 64:
                                     masko = ~((UInt64(1) << UInt64(bitso)) - 1)
                                 var y5 = (
-                                    (UInt64(bwt[po]) << 32) | UInt64(bwt[po + 1])
+                                    (UInt64(bwt[unsafe_offset=po]) << 32) | UInt64(bwt[unsafe_offset=po + 1])
                                 ) & masko
                                 var a5: UInt64
                                 var b6: UInt64
@@ -1505,7 +1505,7 @@ def map_fastq_fm_gpu(
                             sa_ok = False
                         var sa_pos = sa_v
                         if sa_ok:
-                            sa_pos = sa_v + sa[sidx - 1]
+                            sa_pos = sa_v + sa[unsafe_offset=sidx - 1]
                         if sa_ok:
                             var is_rev = Int64(0)
                             var b0 = Int64(0)
@@ -1538,8 +1538,8 @@ def map_fastq_fm_gpu(
                                     var crid = Int64(-1)
                                     while lo < hi2:
                                         var mid = (lo + hi2) // 2
-                                        var off = Int64(contig_off[mid])
-                                        var ln = Int64(contig_len[mid])
+                                        var off = Int64(contig_off[unsafe_offset=mid])
+                                        var ln = Int64(contig_len[unsafe_offset=mid])
                                         if probe < off:
                                             hi2 = mid
                                         elif probe >= off + ln:
@@ -1548,8 +1548,8 @@ def map_fastq_fm_gpu(
                                             crid = mid
                                             break
                                     if crid >= 0:
-                                        var coff = Int64(contig_off[crid])
-                                        var clen = Int64(contig_len[crid])
+                                        var coff = Int64(contig_off[unsafe_offset=crid])
+                                        var clen = Int64(contig_len[unsafe_offset=crid])
                                         var local = bstart - coff
                                         var sl0 = Int64(0)
                                         var sr0 = Int64(0)
@@ -1568,15 +1568,15 @@ def map_fastq_fm_gpu(
                                                 var ppos = bstart + j
                                                 var rb = Int64(
                                                     (
-                                                        pac[ppos >> 2]
+                                                        pac[unsafe_offset=ppos >> 2]
                                                         >> UInt8(((~ppos) & 3) << 1)
                                                     )
                                                     & 3
                                                 )
-                                                var qc = Int64(codes[q_base + j])
+                                                var qc = Int64(codes[unsafe_offset=q_base + j])
                                                 if is_rev != 0:
                                                     var qcr = Int64(
-                                                        codes[q_base + (qlen - 1 - j)]
+                                                        codes[unsafe_offset=q_base + (qlen - 1 - j)]
                                                     )
                                                     if qcr <= 3:
                                                         qc = 3 - qcr
@@ -1596,17 +1596,17 @@ def map_fastq_fm_gpu(
                                                         continue
                                                     var rb0 = Int64(
                                                         (
-                                                            pac[p0 >> 2]
+                                                            pac[unsafe_offset=p0 >> 2]
                                                             >> UInt8(
                                                                 ((~p0) & 3) << 1
                                                             )
                                                         )
                                                         & 3
                                                     )
-                                                    var qc0 = Int64(codes[q_base + sl])
+                                                    var qc0 = Int64(codes[unsafe_offset=q_base + sl])
                                                     if is_rev != 0:
                                                         var q0r = Int64(
-                                                            codes[
+                                                            codes[unsafe_offset=
                                                                 q_base
                                                                 + (qlen - 1 - sl)
                                                             ]
@@ -1632,17 +1632,17 @@ def map_fastq_fm_gpu(
                                                         continue
                                                     var rb1 = Int64(
                                                         (
-                                                            pac[p1 >> 2]
+                                                            pac[unsafe_offset=p1 >> 2]
                                                             >> UInt8(
                                                                 ((~p1) & 3) << 1
                                                             )
                                                         )
                                                         & 3
                                                     )
-                                                    var qc1 = Int64(codes[q_base + jr])
+                                                    var qc1 = Int64(codes[unsafe_offset=q_base + jr])
                                                     if is_rev != 0:
                                                         var q1r = Int64(
-                                                            codes[
+                                                            codes[unsafe_offset=
                                                                 q_base
                                                                 + (qlen - 1 - jr)
                                                             ]
@@ -1666,17 +1666,17 @@ def map_fastq_fm_gpu(
                                                     var pm = bstart + jm
                                                     var rbm = Int64(
                                                         (
-                                                            pac[pm >> 2]
+                                                            pac[unsafe_offset=pm >> 2]
                                                             >> UInt8(
                                                                 ((~pm) & 3) << 1
                                                             )
                                                         )
                                                         & 3
                                                     )
-                                                    var qcm = Int64(codes[q_base + jm])
+                                                    var qcm = Int64(codes[unsafe_offset=q_base + jm])
                                                     if is_rev != 0:
                                                         var qmr = Int64(
-                                                            codes[
+                                                            codes[unsafe_offset=
                                                                 q_base
                                                                 + (qlen - 1 - jm)
                                                             ]
@@ -1706,23 +1706,23 @@ def map_fastq_fm_gpu(
                                                     best_mq = mq
                                                     best_flag = is_rev * 16
                                                     if best_nm == 0:
-                                                        out_rid[rid] = Int32(
+                                                        out_rid[unsafe_offset=rid] = Int32(
                                                             best_rid
                                                         )
-                                                        out_pos[rid] = UInt32(
+                                                        out_pos[unsafe_offset=rid] = UInt32(
                                                             best_pos
                                                         )
-                                                        out_mapq[rid] = best_mq
-                                                        out_flag[rid] = Int32(
+                                                        out_mapq[unsafe_offset=rid] = best_mq
+                                                        out_flag[unsafe_offset=rid] = Int32(
                                                             best_flag
                                                         )
-                                                        out_sl[rid] = UInt32(
+                                                        out_sl[unsafe_offset=rid] = UInt32(
                                                             best_sl
                                                         )
-                                                        out_sr[rid] = UInt32(
+                                                        out_sr[unsafe_offset=rid] = UInt32(
                                                             best_sr
                                                         )
-                                                        out_nm[rid] = UInt32(
+                                                        out_nm[unsafe_offset=rid] = UInt32(
                                                             best_nm
                                                         )
                                                         return
@@ -1742,7 +1742,7 @@ def map_fastq_fm_gpu(
                                                         ):
                                                             var rcd = Int64(
                                                                 (
-                                                                    pac[
+                                                                    pac[unsafe_offset=
                                                                         (bstart + t)
                                                                         >> 2
                                                                     ]
@@ -1762,7 +1762,7 @@ def map_fastq_fm_gpu(
                                                                 & 3
                                                             )
                                                             var qcd = Int64(
-                                                                codes[q_base + t]
+                                                                codes[unsafe_offset=q_base + t]
                                                             )
                                                             if (
                                                                 rcd > 3
@@ -1777,7 +1777,7 @@ def map_fastq_fm_gpu(
                                                         ):
                                                             var rcd2 = Int64(
                                                                 (
-                                                                    pac[
+                                                                    pac[unsafe_offset=
                                                                         (
                                                                             bstart
                                                                             + t
@@ -1802,7 +1802,7 @@ def map_fastq_fm_gpu(
                                                                 & 3
                                                             )
                                                             var qcd2 = Int64(
-                                                                codes[q_base + t]
+                                                                codes[unsafe_offset=q_base + t]
                                                             )
                                                             if (
                                                                 rcd2 > 3
@@ -1828,34 +1828,34 @@ def map_fastq_fm_gpu(
                 e += seed_stride
 
             if best_rid >= 0:
-                out_rid[rid] = Int32(best_rid)
-                out_pos[rid] = UInt32(best_pos)
-                out_mapq[rid] = best_mq
-                out_flag[rid] = Int32(best_flag)
-                out_sl[rid] = UInt32(best_sl)
-                out_sr[rid] = UInt32(best_sr)
-                out_nm[rid] = UInt32(best_nm)
+                out_rid[unsafe_offset=rid] = Int32(best_rid)
+                out_pos[unsafe_offset=rid] = UInt32(best_pos)
+                out_mapq[unsafe_offset=rid] = best_mq
+                out_flag[unsafe_offset=rid] = Int32(best_flag)
+                out_sl[unsafe_offset=rid] = UInt32(best_sl)
+                out_sr[unsafe_offset=rid] = UInt32(best_sr)
+                out_nm[unsafe_offset=rid] = UInt32(best_nm)
 
         def fm_mate_rescue_kernel(
-            pac: UnsafePointer[UInt8, MutAnyOrigin],
-            contig_off: UnsafePointer[UInt64, MutAnyOrigin],
-            contig_len: UnsafePointer[UInt32, MutAnyOrigin],
+            pac: Pointer[UInt8, MutAnyOrigin],
+            contig_off: Pointer[UInt64, MutAnyOrigin],
+            contig_len: Pointer[UInt32, MutAnyOrigin],
             n_contigs: Int64,
             l_pac: UInt64,
-            codes: UnsafePointer[UInt8, MutAnyOrigin],
-            read_lens: UnsafePointer[UInt32, MutAnyOrigin],
+            codes: Pointer[UInt8, MutAnyOrigin],
+            read_lens: Pointer[UInt32, MutAnyOrigin],
             max_len: Int64,
             n_pairs: Int64,
             window: Int64,
             max_diff: Int64,
             max_soft: Int64,
-            out_rid: UnsafePointer[Int32, MutAnyOrigin],
-            out_pos: UnsafePointer[UInt32, MutAnyOrigin],
-            out_mapq: UnsafePointer[UInt32, MutAnyOrigin],
-            out_flag: UnsafePointer[Int32, MutAnyOrigin],
-            out_sl: UnsafePointer[UInt32, MutAnyOrigin],
-            out_sr: UnsafePointer[UInt32, MutAnyOrigin],
-            out_nm: UnsafePointer[UInt32, MutAnyOrigin],
+            out_rid: Pointer[Int32, MutAnyOrigin],
+            out_pos: Pointer[UInt32, MutAnyOrigin],
+            out_mapq: Pointer[UInt32, MutAnyOrigin],
+            out_flag: Pointer[Int32, MutAnyOrigin],
+            out_sl: Pointer[UInt32, MutAnyOrigin],
+            out_sr: Pointer[UInt32, MutAnyOrigin],
+            out_nm: Pointer[UInt32, MutAnyOrigin],
         ):
             # If exactly one mate mapped, gapless-scan ±window on that contig
             # (prefer opposite strand). 1bp deletion only at the best locus.
@@ -1864,8 +1864,8 @@ def map_fastq_fm_gpu(
                 return
             var i1 = pi
             var i2 = pi + n_pairs
-            var m1 = Int64(out_rid[i1]) >= 0
-            var m2 = Int64(out_rid[i2]) >= 0
+            var m1 = Int64(out_rid[unsafe_offset=i1]) >= 0
+            var m2 = Int64(out_rid[unsafe_offset=i2]) >= 0
             if m1 == m2:
                 return
             var src = i1
@@ -1873,15 +1873,15 @@ def map_fastq_fm_gpu(
             if m2:
                 src = i2
                 dst = i1
-            var crid = Int64(out_rid[src])
+            var crid = Int64(out_rid[unsafe_offset=src])
             if crid < 0 or crid >= n_contigs:
                 return
-            var qlen = Int64(read_lens[dst])
+            var qlen = Int64(read_lens[unsafe_offset=dst])
             if qlen < 24:
                 return
-            var coff = Int64(contig_off[crid])
-            var clen = Int64(contig_len[crid])
-            var mate_pos = Int64(out_pos[src])
+            var coff = Int64(contig_off[unsafe_offset=crid])
+            var clen = Int64(contig_len[unsafe_offset=crid])
+            var mate_pos = Int64(out_pos[unsafe_offset=src])
             var win = window
             if win < 32:
                 win = 32
@@ -1907,10 +1907,10 @@ def map_fastq_fm_gpu(
             var scan_nm = Int64(9999)
             var scan_local = lo
             var scan_rev = Int64(0)
-            var mate_rev = (Int64(out_flag[src]) & 16) != 0
+            var mate_rev = (Int64(out_flag[unsafe_offset=src]) & 16) != 0
             var pass_s = Int64(0)
             while pass_s < 2:
-                var is_rev = Int64(1)
+                var is_rev: Int64
                 if pass_s == 0:
                     if mate_rev:
                         is_rev = 0
@@ -1932,11 +1932,11 @@ def map_fastq_fm_gpu(
                     while j < qlen and nm <= budget + 4:
                         var ppos = bstart + j
                         var rb = Int64(
-                            (pac[ppos >> 2] >> UInt8(((~ppos) & 3) << 1)) & 3
+                            (pac[unsafe_offset=ppos >> 2] >> UInt8(((~ppos) & 3) << 1)) & 3
                         )
-                        var qc = Int64(codes[q_base + j])
+                        var qc = Int64(codes[unsafe_offset=q_base + j])
                         if is_rev != 0:
-                            var qcr = Int64(codes[q_base + (qlen - 1 - j)])
+                            var qcr = Int64(codes[unsafe_offset=q_base + (qlen - 1 - j)])
                             if qcr <= 3:
                                 qc = 3 - qcr
                             else:
@@ -1964,11 +1964,11 @@ def map_fastq_fm_gpu(
                         while t < g and nm_d <= budget:
                             var p0 = bstart + t
                             var rb0 = Int64(
-                                (pac[p0 >> 2] >> UInt8(((~p0) & 3) << 1)) & 3
+                                (pac[unsafe_offset=p0 >> 2] >> UInt8(((~p0) & 3) << 1)) & 3
                             )
-                            var qc0 = Int64(codes[q_base + t])
+                            var qc0 = Int64(codes[unsafe_offset=q_base + t])
                             if scan_rev != 0:
-                                var q0r = Int64(codes[q_base + (qlen - 1 - t)])
+                                var q0r = Int64(codes[unsafe_offset=q_base + (qlen - 1 - t)])
                                 if q0r <= 3:
                                     qc0 = 3 - q0r
                                 else:
@@ -1979,11 +1979,11 @@ def map_fastq_fm_gpu(
                         while t < qlen and nm_d <= budget:
                             var p1 = bstart + t + 1
                             var rb1 = Int64(
-                                (pac[p1 >> 2] >> UInt8(((~p1) & 3) << 1)) & 3
+                                (pac[unsafe_offset=p1 >> 2] >> UInt8(((~p1) & 3) << 1)) & 3
                             )
-                            var qc1 = Int64(codes[q_base + t])
+                            var qc1 = Int64(codes[unsafe_offset=q_base + t])
                             if scan_rev != 0:
-                                var q1r = Int64(codes[q_base + (qlen - 1 - t)])
+                                var q1r = Int64(codes[unsafe_offset=q_base + (qlen - 1 - t)])
                                 if q1r <= 3:
                                     qc1 = 3 - q1r
                                 else:
@@ -2002,13 +2002,13 @@ def map_fastq_fm_gpu(
                     mq = 60
                 elif best_nm <= 2:
                     mq = 40
-                out_rid[dst] = Int32(crid)
-                out_pos[dst] = UInt32(best_pos)
-                out_mapq[dst] = mq
-                out_flag[dst] = Int32(best_flag)
-                out_sl[dst] = 0
-                out_sr[dst] = 0
-                out_nm[dst] = UInt32(best_nm)
+                out_rid[unsafe_offset=dst] = Int32(crid)
+                out_pos[unsafe_offset=dst] = UInt32(best_pos)
+                out_mapq[unsafe_offset=dst] = mq
+                out_flag[unsafe_offset=dst] = Int32(best_flag)
+                out_sl[unsafe_offset=dst] = 0
+                out_sr[unsafe_offset=dst] = 0
+                out_nm[unsafe_offset=dst] = UInt32(best_nm)
 
         var api = _device_api(resolved)
         var ctx = DeviceContext(api=api)
@@ -2038,14 +2038,14 @@ def map_fastq_fm_gpu(
         var dev_clen = ctx.enqueue_create_buffer[DType.uint32](n_contigs)
         upload_mmap_to_device(
             ctx,
-            dev_bwt.unsafe_ptr().bitcast[UInt8](),
+            dev_bwt.unsafe_ptr().unsafe_bitcast[UInt8](),
             index.bwt_addr + 40,
             bwt_bytes,
             "bwt",
         )
         upload_mmap_to_device(
             ctx,
-            dev_sa.unsafe_ptr().bitcast[UInt8](),
+            dev_sa.unsafe_ptr().unsafe_bitcast[UInt8](),
             index.sa_addr + 56,
             sa_bytes,
             "sa",
@@ -2419,7 +2419,7 @@ def map_fastq_fm_gpu(
 
         var t_f0 = time_mod.perf_counter()
         var py_cur = Python.none()
-        var n1_cur = 0
+        var n1_cur: Int
         if emit_bam:
             fq_read_batch(fq_stream, arena_cur, batch_size)
             n1_cur = arena_cur.n1
@@ -2437,7 +2437,7 @@ def map_fastq_fm_gpu(
 
         while n1_cur > 0:
             var t_g0 = time_mod.perf_counter()
-            var max_len = 0
+            var max_len: Int
             if emit_bam:
                 max_len = arena_cur.max_len
             else:
@@ -2505,7 +2505,7 @@ def map_fastq_fm_gpu(
                     if ln > 0:
                         unsafe_memcpy(
                             dest=_u8_at(bases_addr + si * max_len),
-                            src=_u8_at(Int(seq_ap[si])),
+                            src=_u8_at(Int(seq_ap[unsafe_offset=si])),
                             count=ln,
                         )
                     si += 1
@@ -2732,7 +2732,7 @@ def map_fastq_fm_gpu(
                                 Int(h_n2_orig_n.unsafe_ptr()),
                                 Int(h_n2_qual_a.unsafe_ptr()),
                                 Int(h_n2_qual_n.unsafe_ptr()),
-                                UnsafePointer[UInt8, MutAnyOrigin](
+                                Pointer[UInt8, MutAnyOrigin](
                                     unsafe_from_address=Int(bam_blob.unsafe_ptr())
                                 ),
                                 bam_cap,
@@ -3144,7 +3144,7 @@ def map_fastq_fm_gpu(
                     Int(h_n2_orig_n.unsafe_ptr()),
                     Int(h_n2_qual_a.unsafe_ptr()),
                     Int(h_n2_qual_n.unsafe_ptr()),
-                    UnsafePointer[UInt8, MutAnyOrigin](
+                    Pointer[UInt8, MutAnyOrigin](
                         unsafe_from_address=Int(bam_blob.unsafe_ptr())
                     ),
                     bam_cap,

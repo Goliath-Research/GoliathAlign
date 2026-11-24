@@ -4,7 +4,7 @@
 # entry 0 unused.
 
 from std.ffi import external_call
-from std.memory import UnsafePointer
+from std.memory import Pointer
 from std.python import Python, PythonObject
 
 from mojo_align_env import ensure_python_path
@@ -30,11 +30,11 @@ def named_coords_none() -> NamedCoordsMojo:
 
 
 def _u32_at(base: Int, off: Int) -> UInt32:
-    var p = UnsafePointer[UInt8, MutAnyOrigin](unsafe_from_address=base + off)
-    var b0 = UInt32(p[0])
-    var b1 = UInt32(p[1])
-    var b2 = UInt32(p[2])
-    var b3 = UInt32(p[3])
+    var p = Pointer[UInt8, MutAnyOrigin](unsafe_from_address=base + off)
+    var b0 = UInt32(p[unsafe_offset=0])
+    var b1 = UInt32(p[unsafe_offset=1])
+    var b2 = UInt32(p[unsafe_offset=2])
+    var b3 = UInt32(p[unsafe_offset=3])
     return b0 | (b1 << 8) | (b2 << 16) | (b3 << 24)
 
 
@@ -110,9 +110,9 @@ def named_coords_open_from_dir(index_dir: String) raises -> NamedCoordsMojo:
         return out^
     var fd = Int(py=os_mod.open(String(nodes), os_mod.O_RDONLY))
     var hint_byte: UInt8 = 0
-    var hint = UnsafePointer(to=hint_byte)
+    var hint = Pointer(to=hint_byte)
     # PROT_READ=1, MAP_PRIVATE=2
-    var addr = external_call["mmap", UnsafePointer[UInt8, MutAnyOrigin]](
+    var addr = external_call["mmap", Pointer[UInt8, MutAnyOrigin]](
         hint, UInt(size), Int32(1), Int32(2), Int32(fd), Int64(0)
     )
     var addr_i = Int(addr)
@@ -163,7 +163,7 @@ def named_coords_try_open() raises -> NamedCoordsMojo:
 def named_coords_close(mut idx: NamedCoordsMojo) raises:
     if not idx.alive:
         return
-    var p = UnsafePointer[UInt8, MutAnyOrigin](unsafe_from_address=idx.addr)
+    var p = Pointer[UInt8, MutAnyOrigin](unsafe_from_address=idx.addr)
     _ = external_call["munmap", Int32](p, UInt(idx.nbytes))
     var os_mod = Python.import_module("os")
     if idx.fd >= 0:

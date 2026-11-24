@@ -2,7 +2,7 @@
 
 from std.sys import exit
 from std.ffi import external_call
-from std.memory import UnsafePointer
+from std.memory import Pointer
 from std.python import Python
 
 from mojo_align_env import giraffe_fixture_root
@@ -16,24 +16,24 @@ def main() raises:
     var fd = Int(py=os_mod.open(path, os_mod.O_RDONLY))
     print("fd=", fd, " size=", size)
 
-    # mmap ignores addr unless MAP_FIXED — pass a stack hint (non-null UnsafePointer).
+    # mmap ignores addr unless MAP_FIXED — pass a stack hint (non-null Pointer).
     var hint_byte: UInt8 = 0
-    var hint = UnsafePointer(to=hint_byte)
-    var addr = external_call["mmap", UnsafePointer[UInt8, MutAnyOrigin]](
+    var hint = Pointer(to=hint_byte)
+    var addr = external_call["mmap", Pointer[UInt8, MutAnyOrigin]](
         hint, UInt(size), Int32(1), Int32(2), Int32(fd), Int64(0)
     )
     var tag = (
-        Int(addr[0])
-        | (Int(addr[1]) << 8)
-        | (Int(addr[2]) << 16)
-        | (Int(addr[3]) << 24)
+        Int(addr[unsafe_offset=0])
+        | (Int(addr[unsafe_offset=1]) << 8)
+        | (Int(addr[unsafe_offset=2]) << 16)
+        | (Int(addr[unsafe_offset=3]) << 24)
     )
     print("tag=", tag, " expect=", 0x31513151)
     if tag != 0x31513151:
         print("FAIL tag")
         exit(1)
-    var u64p = addr.bitcast[UInt64]()
-    print("k=", Int(u64p[1]), " w=", Int(u64p[2]))
+    var u64p = addr.unsafe_bitcast[UInt64]()
+    print("k=", Int(u64p[unsafe_offset=1]), " w=", Int(u64p[unsafe_offset=2]))
     _ = external_call["munmap", Int32](addr, UInt(size))
     _ = os_mod.close(fd)
     print("PASS")

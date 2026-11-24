@@ -101,17 +101,17 @@ def seed_kmers_on_device(
     comptime if has_accelerator():
         from max.gpu import block_dim, block_idx, thread_idx
         from max.gpu.host import DeviceContext
-        from std.memory import UnsafePointer
+        from std.memory import Pointer
 
         def pack_bases_kernel(
-            bases: UnsafePointer[UInt8, MutAnyOrigin],
-            codes: UnsafePointer[UInt8, MutAnyOrigin],
+            bases: Pointer[UInt8, MutAnyOrigin],
+            codes: Pointer[UInt8, MutAnyOrigin],
             n: Int64,
         ):
             var idx = Int64(block_idx.x * block_dim.x + thread_idx.x)
             if idx >= n:
                 return
-            var b = bases[idx]
+            var b = bases[unsafe_offset=idx]
             var code: UInt8 = 255
             if b == 65 or b == 97:
                 code = 0
@@ -121,7 +121,7 @@ def seed_kmers_on_device(
                 code = 2
             elif b == 84 or b == 116:
                 code = 3
-            codes[idx] = code
+            codes[unsafe_offset=idx] = code
 
         def wang_hash_u64(key_in: UInt64) -> UInt64:
             var key = key_in
@@ -135,8 +135,8 @@ def seed_kmers_on_device(
             return key
 
         def kmer_hash_kernel(
-            codes: UnsafePointer[UInt8, MutAnyOrigin],
-            out_hash: UnsafePointer[UInt64, MutAnyOrigin],
+            codes: Pointer[UInt8, MutAnyOrigin],
+            out_hash: Pointer[UInt64, MutAnyOrigin],
             n_bases: Int64,
             k_len: Int64,
             stride: Int64,
@@ -146,15 +146,15 @@ def seed_kmers_on_device(
                 return
             var pos = idx % stride
             if pos + k_len > stride:
-                out_hash[idx] = 0
+                out_hash[unsafe_offset=idx] = 0
                 return
             var base = (idx // stride) * stride + pos
             var key: UInt64 = 0
             var j = Int64(0)
             while j < k_len:
-                var c = codes[base + j]
+                var c = codes[unsafe_offset=base + j]
                 if c > 3:
-                    out_hash[idx] = 0
+                    out_hash[unsafe_offset=idx] = 0
                     return
                 key = (key << 2) | UInt64(c)
                 j += 1
@@ -165,7 +165,7 @@ def seed_kmers_on_device(
             key = (key + (key << 2)) + (key << 4)
             key = key ^ (key >> 28)
             key = key + (key << 31)
-            out_hash[idx] = key
+            out_hash[unsafe_offset=idx] = key
 
         if backend.startswith("devicecontext-cuda") or backend.startswith(
             "devicecontext-hip"

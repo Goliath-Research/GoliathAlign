@@ -74,21 +74,21 @@ def map_fastq_dense_gpu_speed(
     else:
         from max.gpu import block_dim, block_idx, thread_idx
         from max.gpu.host import DeviceContext
-        from std.memory import UnsafePointer, unsafe_memcpy
+        from std.memory import Pointer, unsafe_memcpy
 
         def copy_bytes_offset_kernel(
-            dst: UnsafePointer[UInt8, MutAnyOrigin],
-            src: UnsafePointer[UInt8, MutAnyOrigin],
+            dst: Pointer[UInt8, MutAnyOrigin],
+            src: Pointer[UInt8, MutAnyOrigin],
             dst_off: Int64,
             n: Int64,
         ):
             var tid = Int64(block_idx.x * block_dim.x + thread_idx.x)
             if tid < n:
-                dst[dst_off + tid] = src[tid]
+                dst[unsafe_offset=dst_off + tid] = src[unsafe_offset=tid]
 
         def upload_mmap_to_device[dst_origin: Origin](
             ctx: DeviceContext,
-            dst: UnsafePointer[UInt8, dst_origin],
+            dst: Pointer[UInt8, dst_origin],
             host_addr: Int,
             nbytes: Int,
             label: String,
@@ -106,14 +106,14 @@ def map_fastq_dense_gpu_speed(
                 if n > CHUNK:
                     n = CHUNK
                 var host = ctx.enqueue_create_host_buffer[DType.uint8](n)
-                var src = UnsafePointer[UInt8, MutAnyOrigin](
+                var src = Pointer[UInt8, MutAnyOrigin](
                     unsafe_from_address=host_addr + off
                 )
                 unsafe_memcpy(dest=host.unsafe_ptr(), src=src, count=n)
                 var stage = ctx.enqueue_create_buffer[DType.uint8](n)
                 ctx.enqueue_copy(src_buf=host, dst_buf=stage)
                 var grid = (n + BLOCK - 1) // BLOCK
-                var dst_any = UnsafePointer[UInt8, MutAnyOrigin](
+                var dst_any = Pointer[UInt8, MutAnyOrigin](
                     unsafe_from_address=Int(dst)
                 )
                 ctx.enqueue_function[copy_bytes_offset_kernel](
@@ -138,14 +138,14 @@ def map_fastq_dense_gpu_speed(
                     last_log = off
 
         def pack_bases_kernel(
-            bases: UnsafePointer[UInt8, MutAnyOrigin],
-            codes: UnsafePointer[UInt8, MutAnyOrigin],
+            bases: Pointer[UInt8, MutAnyOrigin],
+            codes: Pointer[UInt8, MutAnyOrigin],
             n: Int64,
         ):
             var idx = Int64(block_idx.x * block_dim.x + thread_idx.x)
             if idx >= n:
                 return
-            var b = bases[idx]
+            var b = bases[unsafe_offset=idx]
             var code: UInt8 = 255
             if b == 65 or b == 97:
                 code = 0
@@ -155,13 +155,13 @@ def map_fastq_dense_gpu_speed(
                 code = 2
             elif b == 84 or b == 116:
                 code = 3
-            codes[idx] = code
+            codes[unsafe_offset=idx] = code
 
         def encode_strided_kernel(
-            codes: UnsafePointer[UInt8, MutAnyOrigin],
-            keys: UnsafePointer[UInt64, MutAnyOrigin],
-            q_offs: UnsafePointer[UInt32, MutAnyOrigin],
-            read_lens: UnsafePointer[UInt32, MutAnyOrigin],
+            codes: Pointer[UInt8, MutAnyOrigin],
+            keys: Pointer[UInt64, MutAnyOrigin],
+            q_offs: Pointer[UInt32, MutAnyOrigin],
+            read_lens: Pointer[UInt32, MutAnyOrigin],
             n_reads: Int64,
             max_len: Int64,
             k_len: Int64,
@@ -175,28 +175,28 @@ def map_fastq_dense_gpu_speed(
             var rid = idx // slots_per_read
             var slot = idx % slots_per_read
             var q_off = slot * seed_stride
-            var L = Int64(read_lens[rid])
-            keys[idx] = UInt64(0xFFFFFFFFFFFFFFFF)
-            q_offs[idx] = UInt32(q_off)
+            var L = Int64(read_lens[unsafe_offset=rid])
+            keys[unsafe_offset=idx] = UInt64(0xFFFFFFFFFFFFFFFF)
+            q_offs[unsafe_offset=idx] = UInt32(q_off)
             if q_off + k_len > L:
                 return
             var base = rid * max_len + q_off
             var key: UInt64 = 0
             var j = Int64(0)
             while j < k_len:
-                var c = codes[base + j]
+                var c = codes[unsafe_offset=base + j]
                 if c > 3:
                     return
                 key = (key << 2) | UInt64(c)
                 j += 1
-            keys[idx] = key
+            keys[unsafe_offset=idx] = key
 
         def locate_bsearch_kernel(
-            keys: UnsafePointer[UInt64, MutAnyOrigin],
-            kmers: UnsafePointer[UInt64, MutAnyOrigin],
-            offsets: UnsafePointer[UInt64, MutAnyOrigin],
-            out_start: UnsafePointer[UInt64, MutAnyOrigin],
-            out_end: UnsafePointer[UInt64, MutAnyOrigin],
+            keys: Pointer[UInt64, MutAnyOrigin],
+            kmers: Pointer[UInt64, MutAnyOrigin],
+            offsets: Pointer[UInt64, MutAnyOrigin],
+            out_start: Pointer[UInt64, MutAnyOrigin],
+            out_end: Pointer[UInt64, MutAnyOrigin],
             n_slots: Int64,
             n_table: Int64,
             max_occ: Int64,
@@ -204,68 +204,68 @@ def map_fastq_dense_gpu_speed(
             var idx = Int64(block_idx.x * block_dim.x + thread_idx.x)
             if idx >= n_slots:
                 return
-            out_start[idx] = 0
-            out_end[idx] = 0
-            var key = keys[idx]
+            out_start[unsafe_offset=idx] = 0
+            out_end[unsafe_offset=idx] = 0
+            var key = keys[unsafe_offset=idx]
             if key == UInt64(0xFFFFFFFFFFFFFFFF) or n_table <= 0:
                 return
             var lo = Int64(0)
             var hi = n_table
             while lo < hi:
                 var mid = (lo + hi) // 2
-                var mk = kmers[mid]
+                var mk = kmers[unsafe_offset=mid]
                 if mk < key:
                     lo = mid + 1
                 else:
                     hi = mid
             if lo >= n_table:
                 return
-            if kmers[lo] != key:
+            if kmers[unsafe_offset=lo] != key:
                 return
-            var start = offsets[lo]
-            var end = offsets[lo + 1]
+            var start = offsets[unsafe_offset=lo]
+            var end = offsets[unsafe_offset=lo + 1]
             var occ = Int64(end - start)
             if occ <= 0 or occ > max_occ:
                 return
-            out_start[idx] = start
-            out_end[idx] = end
+            out_start[unsafe_offset=idx] = start
+            out_end[unsafe_offset=idx] = end
 
         def rc_codes_kernel(
-            codes: UnsafePointer[UInt8, MutAnyOrigin],
-            rc_codes: UnsafePointer[UInt8, MutAnyOrigin],
-            read_lens: UnsafePointer[UInt32, MutAnyOrigin],
+            codes: Pointer[UInt8, MutAnyOrigin],
+            rc_codes: Pointer[UInt8, MutAnyOrigin],
+            read_lens: Pointer[UInt32, MutAnyOrigin],
             n_reads: Int64,
             max_len: Int64,
         ):
             var rid = Int64(block_idx.x * block_dim.x + thread_idx.x)
             if rid >= n_reads:
                 return
-            var L = Int64(read_lens[rid])
+            var L = Int64(read_lens[unsafe_offset=rid])
             var base = rid * max_len
             var i = Int64(0)
             while i < max_len:
-                rc_codes[base + i] = 255
+                rc_codes[unsafe_offset=base + i] = 255
                 i += 1
             var j = Int64(0)
             while j < L:
-                var c = codes[base + (L - 1 - j)]
+                var c = codes[unsafe_offset=base + (L - 1 - j)]
                 var r: UInt8 = 255
                 if c <= 3:
                     r = c ^ 3
-                rc_codes[base + j] = r
+                rc_codes[unsafe_offset=base + j] = r
                 j += 1
 
         def consensus_extend_kernel(
-            occ_start: UnsafePointer[UInt64, MutAnyOrigin],
-            occ_end: UnsafePointer[UInt64, MutAnyOrigin],
-            q_offs: UnsafePointer[UInt32, MutAnyOrigin],
-            postings: UnsafePointer[UInt32, MutAnyOrigin],
+            occ_start: Pointer[UInt64, MutAnyOrigin],
+            occ_end: Pointer[UInt64, MutAnyOrigin],
+            q_offs: Pointer[UInt32, MutAnyOrigin],
+            postings: Pointer[UInt32, MutAnyOrigin],
             n_postings: Int64,
-            sequences: UnsafePointer[UInt8, MutAnyOrigin],
-            contig_off: UnsafePointer[UInt64, MutAnyOrigin],
+            sequences: Pointer[UInt8, MutAnyOrigin],
+            contig_off: Pointer[UInt64, MutAnyOrigin],
             n_contigs: Int64,
-            codes: UnsafePointer[UInt8, MutAnyOrigin],
-            read_lens: UnsafePointer[UInt32, MutAnyOrigin],
+            codes: Pointer[UInt8, MutAnyOrigin],
+            read_lens: Pointer[UInt32, MutAnyOrigin],
             max_len: Int64,
             slots_per_read: Int64,
             n_reads: Int64,
@@ -274,18 +274,18 @@ def map_fastq_dense_gpu_speed(
             vote_occ: Int64,
             pass_mode: Int64,
             n_active: Int64,
-            rid_map: UnsafePointer[Int32, MutAnyOrigin],
-            skip_cid: UnsafePointer[Int32, MutAnyOrigin],
-            skip_nm: UnsafePointer[UInt32, MutAnyOrigin],
+            rid_map: Pointer[Int32, MutAnyOrigin],
+            skip_cid: Pointer[Int32, MutAnyOrigin],
+            skip_nm: Pointer[UInt32, MutAnyOrigin],
             skip_exact: Int64,
             strand_flag: Int32,
-            out_cid: UnsafePointer[Int32, MutAnyOrigin],
-            out_pos: UnsafePointer[UInt32, MutAnyOrigin],
-            out_mapq: UnsafePointer[UInt32, MutAnyOrigin],
-            out_flag: UnsafePointer[Int32, MutAnyOrigin],
-            out_sl: UnsafePointer[UInt32, MutAnyOrigin],
-            out_sr: UnsafePointer[UInt32, MutAnyOrigin],
-            out_nm: UnsafePointer[UInt32, MutAnyOrigin],
+            out_cid: Pointer[Int32, MutAnyOrigin],
+            out_pos: Pointer[UInt32, MutAnyOrigin],
+            out_mapq: Pointer[UInt32, MutAnyOrigin],
+            out_flag: Pointer[Int32, MutAnyOrigin],
+            out_sl: Pointer[UInt32, MutAnyOrigin],
+            out_sr: Pointer[UInt32, MutAnyOrigin],
+            out_nm: Pointer[UInt32, MutAnyOrigin],
         ):
             """Unique-seed consensus, then rare plurality + gapless/softclip.
 
@@ -298,25 +298,25 @@ def map_fastq_dense_gpu_speed(
             if n_active >= 0:
                 if tid >= n_active:
                     return
-                rid = Int64(rid_map[tid])
+                rid = Int64(rid_map[unsafe_offset=tid])
             else:
                 rid = tid
                 if rid >= n_reads:
                     return
             if skip_exact == 1:
-                if Int64(skip_cid[rid]) >= 0 and Int64(skip_nm[rid]) == 0:
-                    out_cid[rid] = Int32(-1)
+                if Int64(skip_cid[unsafe_offset=rid]) >= 0 and Int64(skip_nm[unsafe_offset=rid]) == 0:
+                    out_cid[unsafe_offset=rid] = Int32(-1)
                     return
-            if pass_mode == 1 and Int64(out_cid[rid]) >= 0:
+            if pass_mode == 1 and Int64(out_cid[unsafe_offset=rid]) >= 0:
                 return
-            out_cid[rid] = Int32(-1)
-            out_pos[rid] = 0
-            out_mapq[rid] = 0
-            out_flag[rid] = Int32(4)
-            out_sl[rid] = 0
-            out_sr[rid] = 0
-            out_nm[rid] = 0
-            var qlen = Int64(read_lens[rid])
+            out_cid[unsafe_offset=rid] = Int32(-1)
+            out_pos[unsafe_offset=rid] = 0
+            out_mapq[unsafe_offset=rid] = 0
+            out_flag[unsafe_offset=rid] = Int32(4)
+            out_sl[unsafe_offset=rid] = 0
+            out_sr[unsafe_offset=rid] = 0
+            out_nm[unsafe_offset=rid] = 0
+            var qlen = Int64(read_lens[unsafe_offset=rid])
             if qlen <= 0:
                 return
             var budget = max_diff
@@ -344,8 +344,8 @@ def map_fastq_dense_gpu_speed(
             var slot_g = Int64(0)
             while slot_g < slots_per_read and n_ord < MAX_SLOTS:
                 var sidx_g = rid * slots_per_read + slot_g
-                var a_g = Int64(occ_start[sidx_g])
-                var b_g = Int64(occ_end[sidx_g])
+                var a_g = Int64(occ_start[unsafe_offset=sidx_g])
+                var b_g = Int64(occ_end[unsafe_offset=sidx_g])
                 var occ_g = b_g - a_g
                 if occ_g > 0 and a_g >= 0 and b_g <= n_postings:
                     var ins = n_ord
@@ -390,13 +390,13 @@ def map_fastq_dense_gpu_speed(
                     continue
                 var slot = Int64(ord_slot[oi])
                 var sidx = rid * slots_per_read + slot
-                var a = Int64(occ_start[sidx])
-                var b = Int64(occ_end[sidx])
-                var q_off = Int64(q_offs[sidx])
+                var a = Int64(occ_start[unsafe_offset=sidx])
+                var b = Int64(occ_end[unsafe_offset=sidx])
+                var q_off = Int64(q_offs[unsafe_offset=sidx])
                 var pi = a
                 while pi < b:
-                    var cid = Int64(postings[pi * 2])
-                    var pos = Int64(postings[pi * 2 + 1])
+                    var cid = Int64(postings[unsafe_offset=pi * 2])
+                    var pos = Int64(postings[unsafe_offset=pi * 2 + 1])
                     if cid >= 0 and cid < n_contigs and pos >= q_off:
                         var start0 = pos - q_off
                         var vk = (UInt64(cid) << 32) | UInt64(start0)
@@ -492,8 +492,8 @@ def map_fastq_dense_gpu_speed(
                 var bcid = Int64(bkey >> 32)
                 var bstart = Int64(bkey & UInt64(0xFFFFFFFF))
                 if bcid >= 0 and bcid < n_contigs and bstart >= 0:
-                    var off0 = Int64(contig_off[bcid])
-                    var off1 = Int64(contig_off[bcid + 1])
+                    var off0 = Int64(contig_off[unsafe_offset=bcid])
+                    var off1 = Int64(contig_off[unsafe_offset=bcid + 1])
                     var clen = off1 - off0
                     var adj_i = Int64(0)
                     while adj_i < 3:
@@ -508,8 +508,8 @@ def map_fastq_dense_gpu_speed(
                             var nm_all = Int64(0)
                             var j = Int64(0)
                             while j < qlen and nm_all <= budget:
-                                var rc = sequences[ref_base + j]
-                                var qc = codes[q_base + j]
+                                var rc = sequences[unsafe_offset=ref_base + j]
+                                var qc = codes[unsafe_offset=q_base + j]
                                 if rc > 3 or qc > 3 or rc != qc:
                                     nm_all += 1
                                 j += 1
@@ -518,8 +518,8 @@ def map_fastq_dense_gpu_speed(
                             var nm = nm_all
                             if nm_all > budget and clip_cap > 0:
                                 while sl < clip_cap:
-                                    var rc0 = sequences[ref_base + sl]
-                                    var qc0 = codes[q_base + sl]
+                                    var rc0 = sequences[unsafe_offset=ref_base + sl]
+                                    var qc0 = codes[unsafe_offset=q_base + sl]
                                     if rc0 <= 3 and qc0 <= 3 and rc0 == qc0:
                                         break
                                     sl += 1
@@ -527,16 +527,16 @@ def map_fastq_dense_gpu_speed(
                                     var jr = qlen - 1 - sr
                                     if jr <= sl:
                                         break
-                                    var rc1 = sequences[ref_base + jr]
-                                    var qc1 = codes[q_base + jr]
+                                    var rc1 = sequences[unsafe_offset=ref_base + jr]
+                                    var qc1 = codes[unsafe_offset=q_base + jr]
                                     if rc1 <= 3 and qc1 <= 3 and rc1 == qc1:
                                         break
                                     sr += 1
                                 nm = 0
                                 var jm = sl
                                 while jm < qlen - sr and nm <= budget:
-                                    var rcm = sequences[ref_base + jm]
-                                    var qcm = codes[q_base + jm]
+                                    var rcm = sequences[unsafe_offset=ref_base + jm]
+                                    var qcm = codes[unsafe_offset=q_base + jm]
                                     if rcm > 3 or qcm > 3 or rcm != qcm:
                                         nm += 1
                                     jm += 1
@@ -561,14 +561,14 @@ def map_fastq_dense_gpu_speed(
                                         var nm_d = Int64(1)
                                         var t = Int64(0)
                                         while t < g and nm_d <= budget:
-                                            var rcd = sequences[ref_base + t]
-                                            var qcd = codes[q_base + t]
+                                            var rcd = sequences[unsafe_offset=ref_base + t]
+                                            var qcd = codes[unsafe_offset=q_base + t]
                                             if rcd > 3 or qcd > 3 or rcd != qcd:
                                                 nm_d += 1
                                             t += 1
                                         while t < qlen and nm_d <= budget:
-                                            var rcd2 = sequences[ref_base + t + 1]
-                                            var qcd2 = codes[q_base + t]
+                                            var rcd2 = sequences[unsafe_offset=ref_base + t + 1]
+                                            var qcd2 = codes[unsafe_offset=q_base + t]
                                             if (
                                                 rcd2 > 3
                                                 or qcd2 > 3
@@ -590,16 +590,16 @@ def map_fastq_dense_gpu_speed(
                                         var nm_i = Int64(1)
                                         var ti = Int64(0)
                                         while ti < gi and nm_i <= budget:
-                                            var rci = sequences[ref_base + ti]
-                                            var qci = codes[q_base + ti]
+                                            var rci = sequences[unsafe_offset=ref_base + ti]
+                                            var qci = codes[unsafe_offset=q_base + ti]
                                             if rci > 3 or qci > 3 or rci != qci:
                                                 nm_i += 1
                                             ti += 1
                                         var tj = gi + 1
                                         var rj = gi
                                         while tj < qlen and nm_i <= budget:
-                                            var rci2 = sequences[ref_base + rj]
-                                            var qci2 = codes[q_base + tj]
+                                            var rci2 = sequences[unsafe_offset=ref_base + rj]
+                                            var qci2 = codes[unsafe_offset=q_base + tj]
                                             if (
                                                 rci2 > 3
                                                 or qci2 > 3
@@ -631,21 +631,21 @@ def map_fastq_dense_gpu_speed(
                         n_hi += 1
                         var slot_r = Int64(ord_slot[ri])
                         var sidx_r = rid * slots_per_read + slot_r
-                        var a_r = Int64(occ_start[sidx_r])
-                        var b_r = Int64(occ_end[sidx_r])
-                        var q_off_r = Int64(q_offs[sidx_r])
+                        var a_r = Int64(occ_start[unsafe_offset=sidx_r])
+                        var b_r = Int64(occ_end[unsafe_offset=sidx_r])
+                        var q_off_r = Int64(q_offs[unsafe_offset=sidx_r])
                         var pi_r = a_r
                         while pi_r < b_r and best_cid < 0:
-                            var cid_r = Int64(postings[pi_r * 2])
-                            var pos_r = Int64(postings[pi_r * 2 + 1])
+                            var cid_r = Int64(postings[unsafe_offset=pi_r * 2])
+                            var pos_r = Int64(postings[unsafe_offset=pi_r * 2 + 1])
                             if (
                                 cid_r >= 0
                                 and cid_r < n_contigs
                                 and pos_r >= q_off_r
                             ):
                                 var bstart_r = pos_r - q_off_r
-                                var off0_r = Int64(contig_off[cid_r])
-                                var off1_r = Int64(contig_off[cid_r + 1])
+                                var off0_r = Int64(contig_off[unsafe_offset=cid_r])
+                                var off1_r = Int64(contig_off[unsafe_offset=cid_r + 1])
                                 if (
                                     bstart_r >= 0
                                     and bstart_r + qlen <= (off1_r - off0_r)
@@ -654,8 +654,8 @@ def map_fastq_dense_gpu_speed(
                                     var nm_r = Int64(0)
                                     var jr = Int64(0)
                                     while jr < qlen and nm_r == 0:
-                                        var rcr = sequences[ref_r + jr]
-                                        var qcr = codes[q_base + jr]
+                                        var rcr = sequences[unsafe_offset=ref_r + jr]
+                                        var qcr = codes[unsafe_offset=q_base + jr]
                                         if rcr > 3 or qcr > 3 or rcr != qcr:
                                             nm_r = 1
                                         jr += 1
@@ -681,13 +681,13 @@ def map_fastq_dense_gpu_speed(
                     mq = 60
                 elif best_cost == 0:
                     mq = 40
-                out_cid[rid] = Int32(best_cid)
-                out_pos[rid] = UInt32(best_pos)
-                out_mapq[rid] = mq
-                out_flag[rid] = strand_flag
-                out_sl[rid] = UInt32(best_sl)
-                out_sr[rid] = UInt32(best_sr)
-                out_nm[rid] = UInt32(best_cost)
+                out_cid[unsafe_offset=rid] = Int32(best_cid)
+                out_pos[unsafe_offset=rid] = UInt32(best_pos)
+                out_mapq[unsafe_offset=rid] = mq
+                out_flag[unsafe_offset=rid] = strand_flag
+                out_sl[unsafe_offset=rid] = UInt32(best_sl)
+                out_sr[unsafe_offset=rid] = UInt32(best_sr)
+                out_nm[unsafe_offset=rid] = UInt32(best_cost)
 
         var api = _device_api(resolved)
         var ctx = DeviceContext(api=api)
@@ -728,21 +728,21 @@ def map_fastq_dense_gpu_speed(
         var t_upload0 = time_mod.perf_counter()
         upload_mmap_to_device(
             ctx,
-            dev_kmers.unsafe_ptr().bitcast[UInt8](),
+            dev_kmers.unsafe_ptr().unsafe_bitcast[UInt8](),
             index.kmers_addr,
             kmers_bytes,
             "kmers",
         )
         upload_mmap_to_device(
             ctx,
-            dev_offsets.unsafe_ptr().bitcast[UInt8](),
+            dev_offsets.unsafe_ptr().unsafe_bitcast[UInt8](),
             index.offsets_addr,
             offsets_bytes,
             "offsets",
         )
         upload_mmap_to_device(
             ctx,
-            dev_postings.unsafe_ptr().bitcast[UInt8](),
+            dev_postings.unsafe_ptr().unsafe_bitcast[UInt8](),
             index.postings_addr,
             postings_bytes,
             "postings",
@@ -756,7 +756,7 @@ def map_fastq_dense_gpu_speed(
         )
         upload_mmap_to_device(
             ctx,
-            dev_coff.unsafe_ptr().bitcast[UInt8](),
+            dev_coff.unsafe_ptr().unsafe_bitcast[UInt8](),
             index.contig_off_addr,
             coff_bytes,
             "coff",

@@ -126,7 +126,7 @@ def _gapless_one(
     if best_score >= 0:
         return AlignmentHit(
             "", best_path, q.byte_length(), best_mq, best_cs
-        )^
+        )
 
     var cand = ref_seq
     var pos = _find_substr(q, cand)
@@ -143,7 +143,7 @@ def _gapless_one(
             q.byte_length(),
             mq2,
             "cs:Z::" + String(cand.byte_length()),
-        )^
+        )
 
     if ref_seq.byte_length() < q.byte_length():
         var neighbors = List[Int]()
@@ -181,7 +181,7 @@ def _gapless_one(
                     mq3 = 50
                 return AlignmentHit(
                     "", path, q.byte_length(), mq3, "cs:Z::" + String(qi2)
-                )^
+                )
     return empty^
 
 

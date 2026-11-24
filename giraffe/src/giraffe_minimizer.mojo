@@ -250,17 +250,17 @@ def minimizers_batch_devicecontext(
     comptime if has_accelerator():
         from max.gpu import block_dim, block_idx, thread_idx
         from max.gpu.host import DeviceContext
-        from std.memory import UnsafePointer
+        from std.memory import Pointer
 
         def pack_bases_kernel(
-            bases: UnsafePointer[UInt8, MutAnyOrigin],
-            codes: UnsafePointer[UInt8, MutAnyOrigin],
+            bases: Pointer[UInt8, MutAnyOrigin],
+            codes: Pointer[UInt8, MutAnyOrigin],
             n: Int64,
         ):
             var idx = Int64(block_idx.x * block_dim.x + thread_idx.x)
             if idx >= n:
                 return
-            var b = bases[idx]
+            var b = bases[unsafe_offset=idx]
             var code: UInt8 = 255
             if b == 65 or b == 97:
                 code = 0
@@ -270,15 +270,15 @@ def minimizers_batch_devicecontext(
                 code = 2
             elif b == 84 or b == 116:
                 code = 3
-            codes[idx] = code
+            codes[unsafe_offset=idx] = code
 
         def kmer_fwd_rc_kernel(
-            codes: UnsafePointer[UInt8, MutAnyOrigin],
-            keys_f: UnsafePointer[UInt64, MutAnyOrigin],
-            keys_r: UnsafePointer[UInt64, MutAnyOrigin],
-            hashes_f: UnsafePointer[UInt64, MutAnyOrigin],
-            hashes_r: UnsafePointer[UInt64, MutAnyOrigin],
-            valid: UnsafePointer[UInt8, MutAnyOrigin],
+            codes: Pointer[UInt8, MutAnyOrigin],
+            keys_f: Pointer[UInt64, MutAnyOrigin],
+            keys_r: Pointer[UInt64, MutAnyOrigin],
+            hashes_f: Pointer[UInt64, MutAnyOrigin],
+            hashes_r: Pointer[UInt64, MutAnyOrigin],
+            valid: Pointer[UInt8, MutAnyOrigin],
             n_bases: Int64,
             k_len: Int64,
             stride: Int64,
@@ -288,30 +288,30 @@ def minimizers_batch_devicecontext(
                 return
             var pos = idx % stride
             if pos + k_len > stride:
-                keys_f[idx] = 0
-                keys_r[idx] = 0
-                hashes_f[idx] = 0
-                hashes_r[idx] = 0
-                valid[idx] = 0
+                keys_f[unsafe_offset=idx] = 0
+                keys_r[unsafe_offset=idx] = 0
+                hashes_f[unsafe_offset=idx] = 0
+                hashes_r[unsafe_offset=idx] = 0
+                valid[unsafe_offset=idx] = 0
                 return
             var base = (idx // stride) * stride + pos
             var fk: UInt64 = 0
             var rk: UInt64 = 0
             var j = Int64(0)
             while j < k_len:
-                var c = codes[base + j]
+                var c = codes[unsafe_offset=base + j]
                 if c > 3:
-                    keys_f[idx] = 0
-                    keys_r[idx] = 0
-                    hashes_f[idx] = 0
-                    hashes_r[idx] = 0
-                    valid[idx] = 0
+                    keys_f[unsafe_offset=idx] = 0
+                    keys_r[unsafe_offset=idx] = 0
+                    hashes_f[unsafe_offset=idx] = 0
+                    hashes_r[unsafe_offset=idx] = 0
+                    valid[unsafe_offset=idx] = 0
                     return
                 fk = (fk << 2) | UInt64(c)
                 j += 1
             j = 0
             while j < k_len:
-                var c2 = codes[base + (k_len - 1 - j)]
+                var c2 = codes[unsafe_offset=base + (k_len - 1 - j)]
                 rk = (rk << 2) | (UInt64(c2) ^ 3)
                 j += 1
             # Inline wang hash (device kernel cannot call host fn).
@@ -332,11 +332,11 @@ def minimizers_batch_devicecontext(
             key = (key + (key << 2)) + (key << 4)
             key = key ^ (key >> 28)
             key = key + (key << 31)
-            keys_f[idx] = fk
-            keys_r[idx] = rk
-            hashes_f[idx] = hf
-            hashes_r[idx] = key
-            valid[idx] = 1
+            keys_f[unsafe_offset=idx] = fk
+            keys_r[unsafe_offset=idx] = rk
+            hashes_f[unsafe_offset=idx] = hf
+            hashes_r[unsafe_offset=idx] = key
+            valid[unsafe_offset=idx] = 1
 
         if backend.startswith("devicecontext-cuda") or backend.startswith(
             "devicecontext-hip"

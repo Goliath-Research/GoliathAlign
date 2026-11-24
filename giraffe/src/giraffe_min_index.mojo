@@ -1,10 +1,10 @@
 # Mojo-native vg MinimizerIndex v11 (Q1Q1) HT probe over mmap.
 #
 # Open is a thin bridge (engine.min_mmap_bridge) so the mapping stays alive;
-# all header parse + quadratic probe + hit decode runs in Mojo via UnsafePointer.
+# all header parse + quadratic probe + hit decode runs in Mojo via Pointer.
 
 from std.collections import List
-from std.memory import UnsafePointer
+from std.memory import Pointer
 from std.python import Python, PythonObject
 
 from giraffe_minimizer import MinimizerOcc, wang_hash_64
@@ -42,28 +42,28 @@ struct MojoMinIndex(Movable):
         if self.addr == 0 or self.size < 120:
             raise Error("min mmap open failed: " + path)
 
-        var base = UnsafePointer[UInt8, MutAnyOrigin](unsafe_from_address=self.addr)
+        var base = Pointer[UInt8, MutAnyOrigin](unsafe_from_address=self.addr)
         var tag = (
-            Int(base[0])
-            | (Int(base[1]) << 8)
-            | (Int(base[2]) << 16)
-            | (Int(base[3]) << 24)
+            Int(base[unsafe_offset=0])
+            | (Int(base[unsafe_offset=1]) << 8)
+            | (Int(base[unsafe_offset=2]) << 16)
+            | (Int(base[unsafe_offset=3]) << 24)
         )
         if tag != TAG_Q1Q1:
             raise Error("not a MinimizerIndex Q1Q1 at " + path)
 
-        var u64p = base.bitcast[UInt64]()
+        var u64p = base.unsafe_bitcast[UInt64]()
         # Layout: u32 tag, u32 version, then 8×u64 at offset 8 → u64 index 1..
-        self.k = Int(u64p[1])
-        self.w = Int(u64p[2])
-        var flags = u64p[8]
+        self.k = Int(u64p[unsafe_offset=1])
+        self.w = Int(u64p[unsafe_offset=2])
+        var flags = u64p[unsafe_offset=8]
         var key_bits = Int(flags & 0xFF)
         self.payload_size = Int((flags >> 12) & 0xF)
         if key_bits != 64:
             raise Error("only 64-bit minimizer keys supported")
         self.cell_size = 1 + 1 + self.payload_size
         # ht_words at byte offset 112 → u64 index 14
-        var ht_words = Int(u64p[14])
+        var ht_words = Int(u64p[unsafe_offset=14])
         if ht_words % self.cell_size != 0:
             raise Error("ht_words not divisible by cell_size")
         self.cell_count = ht_words // self.cell_size
@@ -80,11 +80,11 @@ struct MojoMinIndex(Movable):
         self.addr = 0
         self.size = 0
 
-    def _base(self) raises -> UnsafePointer[UInt8, MutAnyOrigin]:
-        return UnsafePointer[UInt8, MutAnyOrigin](unsafe_from_address=self.addr)
+    def _base(self) raises -> Pointer[UInt8, MutAnyOrigin]:
+        return Pointer[UInt8, MutAnyOrigin](unsafe_from_address=self.addr)
 
     def _load_u64(self, byte_off: Int) raises -> UInt64:
-        var p = UnsafePointer[UInt64, MutAnyOrigin](
+        var p = Pointer[UInt64, MutAnyOrigin](
             unsafe_from_address=self.addr + byte_off
         )
         return p[]

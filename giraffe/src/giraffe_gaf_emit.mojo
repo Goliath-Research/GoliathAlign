@@ -219,7 +219,7 @@ def open_gaf_write(path: String) raises -> PythonObject:
 
 def append_gaf_hits(fh: PythonObject, hits: List[AlignmentHit]) raises -> Int:
     """Write mapped hits (skip path=*); return lines written."""
-    var is_wrap = False
+    var is_wrap: Bool
     try:
         _ = fh["gaf"]
         is_wrap = True
@@ -270,7 +270,7 @@ def close_emit(fh: PythonObject) raises:
     if _emit_mode_sam():
         close_sam_write(fh)
         return
-    var is_wrap = False
+    var is_wrap: Bool
     try:
         _ = fh["gaf"]
         is_wrap = True

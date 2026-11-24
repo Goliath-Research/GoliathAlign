@@ -6,7 +6,7 @@
 from max.algorithm import parallelize
 from max.gpu.host import DeviceContext
 from std.collections import List
-from std.memory import Pointer, UnsafePointer, unsafe_memcpy, unsafe_memset
+from std.memory import Pointer, unsafe_memcpy, unsafe_memset
 from std.python import Python, PythonObject
 from std.sys import has_accelerator
 
@@ -178,19 +178,19 @@ def gpu_native_stream_loop(
         from max.gpu import block_dim, block_idx, thread_idx
 
         def copy_bytes_offset_kernel(
-            dst: UnsafePointer[UInt8, MutAnyOrigin],
-            src: UnsafePointer[UInt8, MutAnyOrigin],
+            dst: Pointer[UInt8, MutAnyOrigin],
+            src: Pointer[UInt8, MutAnyOrigin],
             dst_off: Int64,
             n: Int64,
         ):
             """Device-side memcpy into ``dst[dst_off:dst_off+n]`` (no CUDA runtime API)."""
             var tid = Int64(block_idx.x * block_dim.x + thread_idx.x)
             if tid < n:
-                dst[dst_off + tid] = src[tid]
+                dst[unsafe_offset=dst_off + tid] = src[unsafe_offset=tid]
 
         def upload_mmap_to_device(
             ctx: DeviceContext,
-            dst: UnsafePointer[UInt8, MutAnyOrigin],
+            dst: Pointer[UInt8, MutAnyOrigin],
             host_addr: Int,
             nbytes: Int,
         ) raises:
@@ -213,7 +213,7 @@ def gpu_native_stream_loop(
                 if n > CHUNK:
                     n = CHUNK
                 var host = ctx.enqueue_create_host_buffer[DType.uint8](n)
-                var src = UnsafePointer[UInt8, MutAnyOrigin](
+                var src = Pointer[UInt8, MutAnyOrigin](
                     unsafe_from_address=host_addr + off
                 )
                 unsafe_memcpy(dest=host.unsafe_ptr(), src=src, count=n)
@@ -232,14 +232,14 @@ def gpu_native_stream_loop(
                 off += n
 
         def pack_bases_kernel(
-            bases: UnsafePointer[UInt8, MutAnyOrigin],
-            codes: UnsafePointer[UInt8, MutAnyOrigin],
+            bases: Pointer[UInt8, MutAnyOrigin],
+            codes: Pointer[UInt8, MutAnyOrigin],
             n: Int64,
         ):
             var idx = Int64(block_idx.x * block_dim.x + thread_idx.x)
             if idx >= n:
                 return
-            var b = bases[idx]
+            var b = bases[unsafe_offset=idx]
             var code: UInt8 = 255
             if b == 65 or b == 97:
                 code = 0
@@ -249,15 +249,15 @@ def gpu_native_stream_loop(
                 code = 2
             elif b == 84 or b == 116:
                 code = 3
-            codes[idx] = code
+            codes[unsafe_offset=idx] = code
 
         def kmer_fwd_rc_kernel(
-            codes: UnsafePointer[UInt8, MutAnyOrigin],
-            keys_f: UnsafePointer[UInt64, MutAnyOrigin],
-            keys_r: UnsafePointer[UInt64, MutAnyOrigin],
-            hashes_f: UnsafePointer[UInt64, MutAnyOrigin],
-            hashes_r: UnsafePointer[UInt64, MutAnyOrigin],
-            valid: UnsafePointer[UInt8, MutAnyOrigin],
+            codes: Pointer[UInt8, MutAnyOrigin],
+            keys_f: Pointer[UInt64, MutAnyOrigin],
+            keys_r: Pointer[UInt64, MutAnyOrigin],
+            hashes_f: Pointer[UInt64, MutAnyOrigin],
+            hashes_r: Pointer[UInt64, MutAnyOrigin],
+            valid: Pointer[UInt8, MutAnyOrigin],
             n_bases: Int64,
             k_len: Int64,
             stride: Int64,
@@ -267,30 +267,30 @@ def gpu_native_stream_loop(
                 return
             var pos = idx % stride
             if pos + k_len > stride:
-                keys_f[idx] = 0
-                keys_r[idx] = 0
-                hashes_f[idx] = 0
-                hashes_r[idx] = 0
-                valid[idx] = 0
+                keys_f[unsafe_offset=idx] = 0
+                keys_r[unsafe_offset=idx] = 0
+                hashes_f[unsafe_offset=idx] = 0
+                hashes_r[unsafe_offset=idx] = 0
+                valid[unsafe_offset=idx] = 0
                 return
             var base = (idx // stride) * stride + pos
             var fk: UInt64 = 0
             var rk: UInt64 = 0
             var j = Int64(0)
             while j < k_len:
-                var c = codes[base + j]
+                var c = codes[unsafe_offset=base + j]
                 if c > 3:
-                    keys_f[idx] = 0
-                    keys_r[idx] = 0
-                    hashes_f[idx] = 0
-                    hashes_r[idx] = 0
-                    valid[idx] = 0
+                    keys_f[unsafe_offset=idx] = 0
+                    keys_r[unsafe_offset=idx] = 0
+                    hashes_f[unsafe_offset=idx] = 0
+                    hashes_r[unsafe_offset=idx] = 0
+                    valid[unsafe_offset=idx] = 0
                     return
                 fk = (fk << 2) | UInt64(c)
                 j += 1
             j = 0
             while j < k_len:
-                var c2 = codes[base + (k_len - 1 - j)]
+                var c2 = codes[unsafe_offset=base + (k_len - 1 - j)]
                 rk = (rk << 2) | (UInt64(c2) ^ 3)
                 j += 1
             var key = fk
@@ -310,21 +310,21 @@ def gpu_native_stream_loop(
             key = (key + (key << 2)) + (key << 4)
             key = key ^ (key >> 28)
             key = key + (key << 31)
-            keys_f[idx] = fk
-            keys_r[idx] = rk
-            hashes_f[idx] = hf
-            hashes_r[idx] = key
-            valid[idx] = 1
+            keys_f[unsafe_offset=idx] = fk
+            keys_r[unsafe_offset=idx] = rk
+            hashes_f[unsafe_offset=idx] = hf
+            hashes_r[unsafe_offset=idx] = key
+            valid[unsafe_offset=idx] = 1
 
         def window_reduce_kernel(
-            keys_f: UnsafePointer[UInt64, MutAnyOrigin],
-            keys_r: UnsafePointer[UInt64, MutAnyOrigin],
-            hashes_f: UnsafePointer[UInt64, MutAnyOrigin],
-            hashes_r: UnsafePointer[UInt64, MutAnyOrigin],
-            valid: UnsafePointer[UInt8, MutAnyOrigin],
-            read_lens: UnsafePointer[Int32, MutAnyOrigin],
-            out_keys: UnsafePointer[UInt64, MutAnyOrigin],
-            out_n: UnsafePointer[Int32, MutAnyOrigin],
+            keys_f: Pointer[UInt64, MutAnyOrigin],
+            keys_r: Pointer[UInt64, MutAnyOrigin],
+            hashes_f: Pointer[UInt64, MutAnyOrigin],
+            hashes_r: Pointer[UInt64, MutAnyOrigin],
+            valid: Pointer[UInt8, MutAnyOrigin],
+            read_lens: Pointer[Int32, MutAnyOrigin],
+            out_keys: Pointer[UInt64, MutAnyOrigin],
+            out_n: Pointer[Int32, MutAnyOrigin],
             n_reads: Int64,
             stride: Int64,
             k_len: Int64,
@@ -333,7 +333,7 @@ def gpu_native_stream_loop(
             var ri = Int64(block_idx.x * block_dim.x + thread_idx.x)
             if ri >= n_reads:
                 return
-            var L = Int64(read_lens[ri])
+            var L = Int64(read_lens[unsafe_offset=ri])
             var base = ri * stride
             var win = k_len + w_len - 1
             var n_out: Int32 = 0
@@ -354,15 +354,15 @@ def gpu_native_stream_loop(
                     while wi < w_len:
                         var pos = window_start + wi
                         var idx = base + pos
-                        if valid[idx] == 0:
+                        if valid[unsafe_offset=idx] == 0:
                             ok = False
                             break
-                        var use_r = hashes_r[idx] < hashes_f[idx]
-                        var cand_key = keys_f[idx]
-                        var cand_hash = hashes_f[idx]
+                        var use_r = hashes_r[unsafe_offset=idx] < hashes_f[unsafe_offset=idx]
+                        var cand_key = keys_f[unsafe_offset=idx]
+                        var cand_hash = hashes_f[unsafe_offset=idx]
                         if use_r:
-                            cand_key = keys_r[idx]
-                            cand_hash = hashes_r[idx]
+                            cand_key = keys_r[unsafe_offset=idx]
+                            cand_hash = hashes_r[unsafe_offset=idx]
                         if (
                             not have_best
                             or cand_hash < best_hash
@@ -381,23 +381,23 @@ def gpu_native_stream_loop(
                             if best_off >= next_read_offset:
                                 emit = True
                         if emit:
-                            out_keys[row + Int64(n_out)] = best_key
+                            out_keys[unsafe_offset=row + Int64(n_out)] = best_key
                             n_out = n_out + 1
                             next_read_offset = best_off + 1
                             last_hash = best_hash
                             last_offset = best_off
                             have_last = True
                     window_start += 1
-            out_n[ri] = n_out
+            out_n[unsafe_offset=ri] = n_out
 
         def ht_probe_kernel(
-            ht: UnsafePointer[UInt64, MutAnyOrigin],
-            occ_keys: UnsafePointer[UInt64, MutAnyOrigin],
-            occ_n: UnsafePointer[Int32, MutAnyOrigin],
-            out_node: UnsafePointer[Int32, MutAnyOrigin],
-            out_orient: UnsafePointer[UInt8, MutAnyOrigin],
-            out_off: UnsafePointer[Int32, MutAnyOrigin],
-            out_n: UnsafePointer[Int32, MutAnyOrigin],
+            ht: Pointer[UInt64, MutAnyOrigin],
+            occ_keys: Pointer[UInt64, MutAnyOrigin],
+            occ_n: Pointer[Int32, MutAnyOrigin],
+            out_node: Pointer[Int32, MutAnyOrigin],
+            out_orient: Pointer[UInt8, MutAnyOrigin],
+            out_off: Pointer[Int32, MutAnyOrigin],
+            out_n: Pointer[Int32, MutAnyOrigin],
             n_reads: Int64,
             cell_size: Int64,
             cell_count: Int64,
@@ -405,12 +405,12 @@ def gpu_native_stream_loop(
             var ri = Int64(block_idx.x * block_dim.x + thread_idx.x)
             if ri >= n_reads:
                 return
-            var n_occ = Int64(occ_n[ri])
+            var n_occ = Int64(occ_n[unsafe_offset=ri])
             var written: Int32 = 0
             var row = ri * HIT_CAP
             var oi = Int64(0)
             while oi < n_occ and Int(written) < HIT_CAP:
-                var key = occ_keys[ri * MAX_OCCS + oi] & NO_KEY
+                var key = occ_keys[unsafe_offset=ri * MAX_OCCS + oi] & NO_KEY
                 var h = key
                 h = (~h) + (h << 21)
                 h = h ^ (h >> 24)
@@ -424,7 +424,7 @@ def gpu_native_stream_loop(
                 var found = Int64(-1)
                 while attempt < cell_count:
                     var array_off = cell_offset * cell_size
-                    var cell_key = ht[array_off]
+                    var cell_key = ht[unsafe_offset=array_off]
                     var bare = cell_key & NO_KEY
                     if bare == NO_KEY:
                         break
@@ -434,9 +434,9 @@ def gpu_native_stream_loop(
                     cell_offset = (cell_offset + attempt + 1) & (cell_count - 1)
                     attempt += 1
                 if found >= 0:
-                    var ck = ht[found]
+                    var ck = ht[unsafe_offset=found]
                     if (ck & IS_POINTER) == 0:
-                        var pos = ht[found + 1]
+                        var pos = ht[unsafe_offset=found + 1]
                         var node_id = Int(pos >> UInt64(OFFSET_BITS + 1))
                         var is_rev = (pos & REV_MASK) != 0
                         var offset = Int(pos & OFF_MASK)
@@ -444,54 +444,54 @@ def gpu_native_stream_loop(
                             var dup = False
                             var di = Int64(0)
                             while di < Int64(written):
-                                if Int(out_node[row + di]) == node_id and Int(
-                                    out_off[row + di]
+                                if Int(out_node[unsafe_offset=row + di]) == node_id and Int(
+                                    out_off[unsafe_offset=row + di]
                                 ) == offset:
                                     dup = True
                                     break
                                 di += 1
                             if not dup:
-                                out_node[row + Int64(written)] = Int32(node_id)
+                                out_node[unsafe_offset=row + Int64(written)] = Int32(node_id)
                                 if is_rev:
-                                    out_orient[row + Int64(written)] = 1
+                                    out_orient[unsafe_offset=row + Int64(written)] = 1
                                 else:
-                                    out_orient[row + Int64(written)] = 0
-                                out_off[row + Int64(written)] = Int32(offset)
+                                    out_orient[unsafe_offset=row + Int64(written)] = 0
+                                out_off[unsafe_offset=row + Int64(written)] = Int32(offset)
                                 written = written + 1
                 oi += 1
-            out_n[ri] = written
+            out_n[unsafe_offset=ri] = written
 
         def cluster_kernel(
-            in_node: UnsafePointer[Int32, MutAnyOrigin],
-            in_orient: UnsafePointer[UInt8, MutAnyOrigin],
-            in_off: UnsafePointer[Int32, MutAnyOrigin],
-            in_n: UnsafePointer[Int32, MutAnyOrigin],
-            out_node: UnsafePointer[Int32, MutAnyOrigin],
-            out_orient: UnsafePointer[UInt8, MutAnyOrigin],
-            out_off: UnsafePointer[Int32, MutAnyOrigin],
-            out_n: UnsafePointer[Int32, MutAnyOrigin],
+            in_node: Pointer[Int32, MutAnyOrigin],
+            in_orient: Pointer[UInt8, MutAnyOrigin],
+            in_off: Pointer[Int32, MutAnyOrigin],
+            in_n: Pointer[Int32, MutAnyOrigin],
+            out_node: Pointer[Int32, MutAnyOrigin],
+            out_orient: Pointer[UInt8, MutAnyOrigin],
+            out_off: Pointer[Int32, MutAnyOrigin],
+            out_n: Pointer[Int32, MutAnyOrigin],
             n_reads: Int64,
             do_prune: Int64,
         ):
             var ri = Int64(block_idx.x * block_dim.x + thread_idx.x)
             if ri >= n_reads:
                 return
-            var n_in = Int64(in_n[ri])
+            var n_in = Int64(in_n[unsafe_offset=ri])
             var base = ri * HIT_CAP
             var obase = ri * MAX_CLUSTER
             if n_in <= 0:
-                out_n[ri] = 0
+                out_n[unsafe_offset=ri] = 0
                 return
             # Single-pass bucket histogram (HIT_CAP small) vs O(n^2) recount.
-            var best_bucket = Int(in_node[base]) >> 8
+            var best_bucket = Int(in_node[unsafe_offset=base]) >> 8
             var best_count = Int64(0)
             var i = Int64(0)
             while i < n_in:
-                var b = Int(in_node[base + i]) >> 8
+                var b = Int(in_node[unsafe_offset=base + i]) >> 8
                 var c = Int64(1)
                 var j = i + 1
                 while j < n_in:
-                    if (Int(in_node[base + j]) >> 8) == b:
+                    if (Int(in_node[unsafe_offset=base + j]) >> 8) == b:
                         c += 1
                     j += 1
                 if c > best_count:
@@ -506,7 +506,7 @@ def gpu_native_stream_loop(
             var written: Int32 = 0
             i = 0
             while i < n_in and Int(written) < MAX_CLUSTER:
-                var nid = Int(in_node[base + i])
+                var nid = Int(in_node[unsafe_offset=base + i])
                 if (nid >> 8) != best_bucket:
                     i += 1
                     continue
@@ -519,12 +519,12 @@ def gpu_native_stream_loop(
                     if d > DIST_CAP:
                         i += 1
                         continue
-                out_node[obase + Int64(written)] = Int32(nid)
-                out_orient[obase + Int64(written)] = in_orient[base + i]
-                out_off[obase + Int64(written)] = in_off[base + i]
+                out_node[unsafe_offset=obase + Int64(written)] = Int32(nid)
+                out_orient[unsafe_offset=obase + Int64(written)] = in_orient[unsafe_offset=base + i]
+                out_off[unsafe_offset=obase + Int64(written)] = in_off[unsafe_offset=base + i]
                 written = written + 1
                 i += 1
-            out_n[ri] = written
+            out_n[unsafe_offset=ri] = written
 
         def upper_code(b: UInt8) -> UInt8:
             if b == 97:
@@ -553,21 +553,21 @@ def gpu_native_stream_loop(
             # Raw ASCII query bases (same alphabet as sequences.bin / pack_seq).
             # Must NOT be pack_bases_kernel codes (0–3) — upper_code/comp_base
             # and qb==rb compare ASCII.
-            q_bases: UnsafePointer[UInt8, MutAnyOrigin],
-            read_lens: UnsafePointer[Int32, MutAnyOrigin],
+            q_bases: Pointer[UInt8, MutAnyOrigin],
+            read_lens: Pointer[Int32, MutAnyOrigin],
             q_stride: Int64,
-            pack_off: UnsafePointer[UInt64, MutAnyOrigin],
-            pack_seq: UnsafePointer[UInt8, MutAnyOrigin],
+            pack_off: Pointer[UInt64, MutAnyOrigin],
+            pack_seq: Pointer[UInt8, MutAnyOrigin],
             pack_n: Int64,
             seq_bytes: Int64,
-            seed_node: UnsafePointer[Int32, MutAnyOrigin],
-            seed_orient: UnsafePointer[UInt8, MutAnyOrigin],
-            seed_off: UnsafePointer[Int32, MutAnyOrigin],
-            seed_n: UnsafePointer[Int32, MutAnyOrigin],
-            out_node: UnsafePointer[Int32, MutAnyOrigin],
-            out_mapq: UnsafePointer[Int32, MutAnyOrigin],
-            out_matched: UnsafePointer[Int32, MutAnyOrigin],
-            out_valid: UnsafePointer[UInt8, MutAnyOrigin],
+            seed_node: Pointer[Int32, MutAnyOrigin],
+            seed_orient: Pointer[UInt8, MutAnyOrigin],
+            seed_off: Pointer[Int32, MutAnyOrigin],
+            seed_n: Pointer[Int32, MutAnyOrigin],
+            out_node: Pointer[Int32, MutAnyOrigin],
+            out_mapq: Pointer[Int32, MutAnyOrigin],
+            out_matched: Pointer[Int32, MutAnyOrigin],
+            out_valid: Pointer[UInt8, MutAnyOrigin],
             n_reads: Int64,
         ):
             var tid = Int64(block_idx.x * block_dim.x + thread_idx.x)
@@ -576,31 +576,31 @@ def gpu_native_stream_loop(
                 return
             var ri = tid // MAX_CLUSTER
             var si = tid % MAX_CLUSTER
-            out_valid[tid] = 0
-            out_node[tid] = 0
-            out_mapq[tid] = 0
-            out_matched[tid] = 0
-            var n_seeds = Int64(seed_n[ri])
+            out_valid[unsafe_offset=tid] = 0
+            out_node[unsafe_offset=tid] = 0
+            out_mapq[unsafe_offset=tid] = 0
+            out_matched[unsafe_offset=tid] = 0
+            var n_seeds = Int64(seed_n[unsafe_offset=ri])
             if si >= n_seeds:
                 return
-            var qlen = Int64(read_lens[ri])
+            var qlen = Int64(read_lens[unsafe_offset=ri])
             if qlen <= 0:
                 return
-            var node_id = Int64(seed_node[ri * MAX_CLUSTER + si])
+            var node_id = Int64(seed_node[unsafe_offset=ri * MAX_CLUSTER + si])
             if node_id < 1 or node_id > pack_n:
                 return
-            var is_rev = seed_orient[ri * MAX_CLUSTER + si] != 0
-            var offset = Int64(seed_off[ri * MAX_CLUSTER + si])
+            var is_rev = seed_orient[unsafe_offset=ri * MAX_CLUSTER + si] != 0
+            var offset = Int64(seed_off[unsafe_offset=ri * MAX_CLUSTER + si])
             var oidx = (node_id - 1) * 2
-            var seg_off = Int64(pack_off[oidx])
-            var seg_len = Int64(pack_off[oidx + 1])
+            var seg_off = Int64(pack_off[unsafe_offset=oidx])
+            var seg_len = Int64(pack_off[unsafe_offset=oidx + 1])
             if seg_off < 0 or seg_len <= 0 or seg_off + seg_len > seq_bytes:
                 return
 
             var qbase = ri * q_stride
-            var start0 = Int64(0)
-            var start1 = Int64(0)
-            var start2 = Int64(0)
+            var start0: Int64
+            var start1: Int64
+            var start2: Int64
             if is_rev:
                 start0 = seg_len - offset - qlen
                 if start0 < 0:
@@ -634,13 +634,13 @@ def gpu_native_stream_loop(
                 var qi = Int64(0)
                 var rpos = start
                 while qi < qlen and rpos < seg_len:
-                    var qb = upper_code(q_bases[qbase + qi])
+                    var qb = upper_code(q_bases[unsafe_offset=qbase + qi])
                     var rb: UInt8 = 0
                     if is_rev:
                         # ref_aln[rpos] = RC(ref)[rpos] = comp(ref[seg_len-1-rpos])
-                        rb = comp_base(pack_seq[seg_off + (seg_len - 1 - rpos)])
+                        rb = comp_base(pack_seq[unsafe_offset=seg_off + (seg_len - 1 - rpos)])
                     else:
-                        rb = upper_code(pack_seq[seg_off + rpos])
+                        rb = upper_code(pack_seq[unsafe_offset=seg_off + rpos])
                     if qb == rb:
                         matched += 1
                     else:
@@ -674,10 +674,10 @@ def gpu_native_stream_loop(
                     mq = 60
                 else:
                     mq = 40
-            out_node[tid] = Int32(node_id)
-            out_mapq[tid] = Int32(mq)
-            out_matched[tid] = Int32(best_matched)
-            out_valid[tid] = 1
+            out_node[unsafe_offset=tid] = Int32(node_id)
+            out_mapq[unsafe_offset=tid] = Int32(mq)
+            out_matched[unsafe_offset=tid] = Int32(best_matched)
+            out_valid[unsafe_offset=tid] = 1
 
         # ---- single DeviceContext session ----
         # Mojo NVIDIA backend token is "cuda"; AMD is "hip". We do not call the
@@ -698,13 +698,13 @@ def gpu_native_stream_loop(
         ctx.synchronize()
         upload_mmap_to_device(
             ctx,
-            _mut_u8(dev_ht.unsafe_ptr().bitcast[UInt8]()),
+            _mut_u8(dev_ht.unsafe_ptr().unsafe_bitcast[UInt8]()),
             meta.ht_host_addr,
             meta.ht_words * 8,
         )
         upload_mmap_to_device(
             ctx,
-            _mut_u8(dev_off.unsafe_ptr().bitcast[UInt8]()),
+            _mut_u8(dev_off.unsafe_ptr().unsafe_bitcast[UInt8]()),
             meta.off_host_addr,
             meta.off_bytes,
         )
@@ -906,7 +906,7 @@ def gpu_native_stream_loop(
                     if L > 0:
                         var sb = s.as_bytes()
                         unsafe_memcpy(
-                            dest=host_bases.unsafe_ptr() + ri * stride,
+                            dest=host_bases.unsafe_ptr().unsafe_offset(ri * stride),
                             src=sb.unsafe_ptr(),
                             count=L,
                         )
@@ -1257,8 +1257,6 @@ def gpu_native_stream_loop(
 
         if has_pending:
             n_written += append_gaf_hits(out_fh, pending_hits)
-            pending_hits = List[AlignmentHit]()
-            has_pending = False
 
         print(
             "mojo_stream_gpu_session records=",

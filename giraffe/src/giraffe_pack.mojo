@@ -5,7 +5,7 @@
 # into a String without calling Python SegmentPack.get.
 
 from std.collections import List
-from std.memory import UnsafePointer
+from std.memory import Pointer
 from std.python import Python, PythonObject
 
 from mojo_align_env import ensure_python_path
@@ -18,11 +18,11 @@ def _bootstrap_sys_path() raises:
 def _ascii_from_addr(addr: Int, length: Int) raises -> String:
     if length <= 0:
         return String("")
-    var p = UnsafePointer[UInt8, MutAnyOrigin](unsafe_from_address=addr)
+    var p = Pointer[UInt8, MutAnyOrigin](unsafe_from_address=addr)
     var out = String("")
     var i = 0
     while i < length:
-        out += chr(Int(p[i]))
+        out += chr(Int(p[unsafe_offset=i]))
         i += 1
     return out^
 
@@ -124,7 +124,7 @@ struct DensePack(Copyable, Movable):
             self.seq_addr = 0
 
     def _load_u64(self, base_addr: Int, byte_off: Int) raises -> UInt64:
-        var p = UnsafePointer[UInt64, MutAnyOrigin](
+        var p = Pointer[UInt64, MutAnyOrigin](
             unsafe_from_address=base_addr + byte_off
         )
         return p[]

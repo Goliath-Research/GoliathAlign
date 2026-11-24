@@ -7,7 +7,7 @@
 # Toys without a pack: in-memory Dict + Mojo FASTA parse via open_text_read.
 
 from std.collections import Dict, List
-from std.memory import UnsafePointer
+from std.memory import Pointer
 from std.python import Python, PythonObject
 
 from utility import open_text_read, open_text_write
@@ -36,22 +36,22 @@ struct SeedVote(Copyable, Movable):
 
 def _u64_le(addr: Int, idx: Int) -> UInt64:
     var base = addr + idx * 8
-    var p = UnsafePointer[UInt8, MutAnyOrigin](unsafe_from_address=base)
+    var p = Pointer[UInt8, MutAnyOrigin](unsafe_from_address=base)
     var v: UInt64 = 0
     var b = 0
     while b < 8:
-        v |= UInt64(p[b]) << (UInt64(b) * 8)
+        v |= UInt64(p[unsafe_offset=b]) << (UInt64(b) * 8)
         b += 1
     return v
 
 
 def _u32_le(addr: Int, idx: Int) -> UInt32:
     var base = addr + idx * 4
-    var p = UnsafePointer[UInt8, MutAnyOrigin](unsafe_from_address=base)
+    var p = Pointer[UInt8, MutAnyOrigin](unsafe_from_address=base)
     var v: UInt32 = 0
     var b = 0
     while b < 4:
-        v |= UInt32(p[b]) << (UInt32(b) * 8)
+        v |= UInt32(p[unsafe_offset=b]) << (UInt32(b) * 8)
         b += 1
     return v
 
@@ -63,7 +63,7 @@ def _encode_kmer_u64(mer: String, k: Int) raises -> UInt64:
     var i = 0
     while i < k:
         var ch = String(mer[byte = i : i + 1]).upper()
-        var bits: UInt64 = 0
+        var bits: UInt64
         if ch == "A":
             bits = 0
         elif ch == "C":
@@ -82,11 +82,11 @@ def _encode_kmer_u64(mer: String, k: Int) raises -> UInt64:
 def _ascii_from_addr(addr: Int, length: Int) raises -> String:
     if length <= 0:
         return String("")
-    var p = UnsafePointer[UInt8, MutAnyOrigin](unsafe_from_address=addr)
+    var p = Pointer[UInt8, MutAnyOrigin](unsafe_from_address=addr)
     var out = String("")
     var i = 0
     while i < length:
-        var b = Int(p[i])
+        var b = Int(p[unsafe_offset=i])
         # Uppercase a-z for gapless compare.
         if b >= 97 and b <= 122:
             b = b - 32

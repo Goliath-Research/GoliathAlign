@@ -57,21 +57,21 @@ def scatter_add_u32_on_device(
         from std.atomic import Atomic
         from max.gpu import block_dim, block_idx, thread_idx
         from max.gpu.host import DeviceContext
-        from std.memory import UnsafePointer
+        from std.memory import Pointer
 
         def scatter_u32_kernel(
-            dst: UnsafePointer[UInt32, MutAnyOrigin],
-            index: UnsafePointer[Int32, MutAnyOrigin],
-            src: UnsafePointer[UInt32, MutAnyOrigin],
+            dst: Pointer[UInt32, MutAnyOrigin],
+            index: Pointer[Int32, MutAnyOrigin],
+            src: Pointer[UInt32, MutAnyOrigin],
             n: Int,
         ):
             var i = Int(block_idx.x * block_dim.x + thread_idx.x)
             if i >= n:
                 return
-            var j = Int(index[i])
+            var j = Int(index[unsafe_offset=i])
             # Duplicate indices must accumulate (np.add.at). A plain
             # load-add-store drops concurrent writes to the same j.
-            _ = Atomic[UInt32].fetch_add(dst + j, src[i])
+            _ = Atomic[UInt32].fetch_add(dst.unsafe_offset(j), src[unsafe_offset=i])
 
         if backend.startswith("devicecontext-cuda") or backend.startswith(
             "devicecontext-hip"

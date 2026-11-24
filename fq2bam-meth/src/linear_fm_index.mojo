@@ -3,7 +3,7 @@
 # Used by the FM / BWA-MEM-style GPU engine (linear_gpu_fm.mojo).
 
 from std.collections import List
-from std.memory import UnsafePointer
+from std.memory import Pointer
 from std.python import Python, PythonObject
 
 from mojo_align_env import ensure_python_path
@@ -175,19 +175,19 @@ struct FmIndex(Copyable, Movable):
         )
 
     def _u64(self, base_addr: Int, idx: Int) -> UInt64:
-        var p = UnsafePointer[UInt8, MutAnyOrigin](
+        var p = Pointer[UInt8, MutAnyOrigin](
             unsafe_from_address=base_addr + idx * 8
         )
         var v: UInt64 = 0
         var b = 0
         while b < 8:
-            v |= UInt64(p[b]) << (UInt64(b) * 8)
+            v |= UInt64(p[unsafe_offset=b]) << (UInt64(b) * 8)
             b += 1
         return v
 
     def _bwt_u32(self, idx: Int) -> UInt32:
         # BWT payload starts after 40-byte header.
-        var p = UnsafePointer[UInt8, MutAnyOrigin](
+        var p = Pointer[UInt8, MutAnyOrigin](
             unsafe_from_address=self.bwt_addr + 40 + idx * 4
         )
         var v: UInt32 = 0
@@ -206,7 +206,7 @@ struct FmIndex(Copyable, Movable):
     def pac_base(self, pos: Int) -> Int:
         if pos < 0 or UInt64(pos) >= self.l_pac:
             return 4
-        var byte = UnsafePointer[UInt8, MutAnyOrigin](
+        var byte = Pointer[UInt8, MutAnyOrigin](
             unsafe_from_address=self.pac_addr + (pos >> 2)
         )[0]
         return Int((byte >> UInt8(((~pos) & 3) << 1)) & 3)
@@ -293,7 +293,7 @@ struct FmIndex(Copyable, Movable):
         return sa + self._sa_sample(Int(kk // UInt64(self.sa_intv)))
 
     def match_exact(
-        self, codes: UnsafePointer[UInt8, MutAnyOrigin], length: Int
+        self, codes: Pointer[UInt8, MutAnyOrigin], length: Int
     ) raises -> FmMatch:
         """Backward search. Returns FmMatch with occ=0 if no match."""
         var k: UInt64 = 0

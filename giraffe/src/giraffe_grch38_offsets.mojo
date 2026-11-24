@@ -6,7 +6,7 @@
 # chrom_idx == 0xFFFFFFFF means unset.
 
 from std.collections import List
-from std.memory import UnsafePointer
+from std.memory import Pointer
 from std.python import Python, PythonObject
 
 comptime UNSET_CHROM: UInt32 = 0xFFFFFFFF
@@ -130,13 +130,13 @@ struct Grch38Offsets(Copyable, Movable):
         self.loaded = False
 
     def _load_u32(self, byte_off: Int) raises -> UInt32:
-        var p = UnsafePointer[UInt32, MutAnyOrigin](
+        var p = Pointer[UInt32, MutAnyOrigin](
             unsafe_from_address=self.addr + byte_off
         )
         return p[]
 
     def _load_u64(self, byte_off: Int) raises -> UInt64:
-        var p = UnsafePointer[UInt64, MutAnyOrigin](
+        var p = Pointer[UInt64, MutAnyOrigin](
             unsafe_from_address=self.addr + byte_off
         )
         return p[]

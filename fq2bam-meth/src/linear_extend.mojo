@@ -71,7 +71,7 @@ def _vote_and_verify(
     """K-mer majority vote → gapless verify."""
     var qlen = seq.byte_length()
     if len(hits) == 0:
-        return LinearHit(name, 4, "*", 0, 0, "*", seq, "*")^
+        return LinearHit(name, 4, "*", 0, 0, "*", seq, "*")
 
     var counts = Dict[String, Int]()
     for h in hits:
@@ -96,11 +96,11 @@ def _vote_and_verify(
             best_key = key.copy()
 
     if best_n <= 0 or best_key.byte_length() == 0:
-        return LinearHit(name, 4, "*", 0, 0, "*", seq, "*")^
+        return LinearHit(name, 4, "*", 0, 0, "*", seq, "*")
 
     var bp = best_key.split(":")
     if len(bp) < 2:
-        return LinearHit(name, 4, "*", 0, 0, "*", seq, "*")^
+        return LinearHit(name, 4, "*", 0, 0, "*", seq, "*")
     var contig = String(bp[0])
     var seed_off = Int(String(bp[1]))
     var window = index.contig_window(contig, seed_off, qlen)
@@ -113,7 +113,7 @@ def _vote_and_verify(
         return LinearHit(
             name, 0, contig, seed_off + 1, mq, String(qlen) + "M", seq, "*"
         )
-    return LinearHit(name, 4, "*", 0, 0, "*", seq, "*")^
+    return LinearHit(name, 4, "*", 0, 0, "*", seq, "*")
 
 
 def _seed_stride() raises -> Int:
@@ -208,7 +208,7 @@ def extend_read_with_seeds(
                         seq,
                         "*",
                     )
-        return LinearHit(name, 4, "*", 0, 0, "*", seq, "*")^
+        return LinearHit(name, 4, "*", 0, 0, "*", seq, "*")
 
     # Toy / non-dense: GPU/host k-mers → string postings → gapless verify.
     var hits = List[String]()
@@ -242,7 +242,7 @@ def extend_read_with_seeds(
                 return LinearHit(
                     name, 16, c.name, off2 + 1, 60, String(qlen) + "M", seq, "*"
                 )
-    return LinearHit(name, 4, "*", 0, 0, "*", seq, "*")^
+    return LinearHit(name, 4, "*", 0, 0, "*", seq, "*")
 
 
 def extend_read(index: LinearIndex, name: String, seq: String) raises -> LinearHit:
@@ -291,7 +291,7 @@ def pair_hits(h1: LinearHit, h2: LinearHit) raises -> PairedHits:
         if b.contig != "*":
             a.rnext = b.contig
             a.pnext = b.pos
-    return PairedHits(a^, b^)
+    return PairedHits(a, b)
 
 
 def hit_to_sam_line(h: LinearHit) -> String:

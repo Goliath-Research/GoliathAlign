@@ -4,7 +4,7 @@
 # converted FASTQs already carry C2T/G2A bodies; open with convert=0 and parse
 # MG headers (``os`` / ``rc``) in the caller.
 
-from std.memory import UnsafePointer
+from std.memory import Pointer
 
 from linear_fastq import (
     FastqPairStream,
@@ -21,12 +21,12 @@ def _ascii_span(buf_addr: Int, off: Int, n: Int) raises -> String:
     # Chunked ``+= chr`` (64-byte pieces) — full-string ``+=`` was O(n^2) on long
     # MG headers (embedded original_seq). No Python here: this runs under
     # ``parallelize`` (sync||prefetch) where ``Python.import_module`` segfaults.
-    var p = UnsafePointer[UInt8, MutAnyOrigin](unsafe_from_address=buf_addr + off)
+    var p = Pointer[UInt8, MutAnyOrigin](unsafe_from_address=buf_addr + off)
     var out = String("")
     var chunk = String("")
     var i = 0
     while i < n:
-        chunk += chr(Int(p[i]))
+        chunk += chr(Int(p[unsafe_offset=i]))
         if chunk.byte_length() >= 64:
             out += chunk
             chunk = String("")
