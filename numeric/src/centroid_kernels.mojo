@@ -71,7 +71,7 @@ def scatter_add_u32_on_device(
             var j = Int(index[i])
             # Duplicate indices must accumulate (np.add.at). A plain
             # load-add-store drops concurrent writes to the same j.
-            _ = Atomic[DType.uint32].fetch_add(dst + j, src[i])
+            _ = Atomic[UInt32].fetch_add(dst + j, src[i])
 
         if backend.startswith("devicecontext-cuda") or backend.startswith(
             "devicecontext-hip"
