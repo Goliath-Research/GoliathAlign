@@ -1,13 +1,14 @@
 # Install
 
-GoliathAlign's toolchain is the pixi environment in the repository root. The lockfile covers two hosts:
+GoliathAlign's toolchain is the pixi environment in the repository root. The lockfile covers three hosts:
 
 | Platform | Machines |
 |----------|----------|
 | `linux-64` | Linux x86-64 |
 | `linux-aarch64` | Linux ARM64 |
+| `osx-arm64` | macOS Apple Silicon |
 
-Pixi installs Mojo / MAX (`modular` 26.6), Python (≥ 3.11 and &lt; 3.14; the lock solves 3.13), pytest, and Pyrefly. It does not install `samtools`, `bwa`, or `vg`.
+Pixi installs Mojo / MAX (`max` 26.7 and `mojo` 1.2), Python (3.14), pytest, and Pyrefly. It does not install `samtools`, `bwa`, or `vg`.
 
 ```bash
 curl -fsSL https://pixi.sh/install.sh | bash   # once, if pixi is not on PATH

@@ -20,7 +20,7 @@ jobs:
           curl -fsSL https://pixi.sh/install.sh | bash
           echo "$HOME/.pixi/bin" >> "$GITHUB_PATH"
 
-      - name: Install the Mojo 1.1 toolchain
+      - name: Install the Mojo 1.2 toolchain
         run: |
           set -euo pipefail
           pixi --version
@@ -76,7 +76,7 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: "3.14"
 
       - name: Validate .goliath/product.json
         run: |
@@ -91,7 +91,7 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: "3.14"
 
       - name: Build the MkDocs site
         run: |

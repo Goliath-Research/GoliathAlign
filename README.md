@@ -10,7 +10,7 @@ Longer notes live under [`docs/`](docs/index.md) and on the published site at <h
 
 ## Install
 
-Pixi solves the Mojo / MAX toolchain, Python, pytest, and Pyrefly for `linux-64` and `linux-aarch64`:
+Pixi solves the Mojo / MAX toolchain, Python, pytest, and Pyrefly for `linux-64`, `linux-aarch64`, and `osx-arm64`:
 
 ```bash
 curl -fsSL https://pixi.sh/install.sh | bash   # once, if pixi is not on PATH
@@ -36,6 +36,7 @@ The published host runtime is separate from a pixi checkout. See [Release 0.1.0-
 |------|-----|
 | Linux x86-64 | pixi platform `linux-64` |
 | Linux ARM64 | pixi platform `linux-aarch64` |
+| macOS Apple Silicon | pixi platform `osx-arm64` |
 
 Host architecture is independent of the compute device. `-device` and `METHYLGRAPHER_ALIGN_DEVICE` accept `auto`, `cpu`, `nvidia`, and `amd`.
 
@@ -117,7 +118,7 @@ Helper scripts under `fq2bam-meth/scripts/` such as `run_toy_fq2bam_meth.sh` tre
 
 GitHub Actions (`.github/workflows/ci.yml`) installs pixi, runs `methylGrapher help`, Pyrefly, a pytest subset, and the flat-tree stage. It also validates [`.goliath/product.json`](.goliath/product.json) and builds the MkDocs site. The docs job does not upload the site.
 
-Python helpers are checked with [Pyrefly](https://pyrefly.org) using [`pyrefly.toml`](pyrefly.toml) and the Python 3.13 interpreter locked by pixi. Mojo sources are outside the check. `methylgrapher/python_reference/` is frozen upstream and is excluded.
+Python helpers are checked with [Pyrefly](https://pyrefly.org) using [`pyrefly.toml`](pyrefly.toml) and the Python 3.14 interpreter locked by pixi. Mojo sources are outside the check. `methylgrapher/python_reference/` is frozen upstream and is excluded.
 
 ```bash
 pixi run typecheck

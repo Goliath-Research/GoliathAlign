@@ -8,7 +8,7 @@
 
 from std.collections import List
 from std.python import Python
-from std.sys import has_accelerator, has_nvidia_gpu_accelerator
+from std.sys import has_accelerator
 
 from gpu_kmer import extract_kmers
 
@@ -94,8 +94,6 @@ def seed_kmers_on_device(
         target,
         " backend=",
         backend,
-        " has_nvidia=",
-        has_nvidia_gpu_accelerator(),
         " has_accel=",
         has_accelerator(),
     )

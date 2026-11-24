@@ -2,7 +2,7 @@
 
 ## Hosts
 
-The pixi environment is solved for `linux-64` and `linux-aarch64` only. The jammy release tarball is built on `ubuntu:22.04` and records `arch=amd64` in `HOST_RUNTIME.txt`. An ARM64 machine uses a pixi checkout rather than that tarball.
+The pixi environment is solved for `linux-64`, `linux-aarch64`, and `osx-arm64`. The jammy release tarball is built on `ubuntu:22.04` and records `arch=amd64` in `HOST_RUNTIME.txt`. ARM64 and Apple Silicon machines use a pixi checkout rather than that tarball.
 
 ## Devices
 

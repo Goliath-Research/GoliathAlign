@@ -30,7 +30,7 @@ MOJO_I=(
 export PYTHONPATH="${REPO_ROOT}/methylgrapher:${REPO_ROOT}/giraffe/scripts:${REPO_ROOT}/giraffe/python:${REPO_ROOT}/fq2bam-meth/python:${REPO_ROOT}/gpu-common/python${PYTHONPATH:+:$PYTHONPATH}"
 
 if [[ "${METHYLGRAPHER_ENGINE:-}" == "mojo" ]]; then
-    # Mojo 1.1 eagerly emits reachable GPU kernels, so compilation must target
+    # Mojo 1.2 eagerly emits reachable GPU kernels, so compilation must target
     # a supported production accelerator even when this host only has sm_50.
     # Operators can override this for another deployed architecture.
     TARGET_ACCELERATOR="${METHYLGRAPHER_TARGET_ACCELERATOR:-}"

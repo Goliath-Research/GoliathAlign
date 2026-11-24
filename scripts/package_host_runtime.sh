@@ -72,9 +72,11 @@ cp -a /out/flat/src "$DEST/"
 cp -a "$PIXI_ENV/bin/mojo" "$DEST/mojo-env/bin/"
 [[ -x "$PIXI_ENV/bin/modular-crashpad-handler" ]] \
   && cp -a "$PIXI_ENV/bin/modular-crashpad-handler" "$DEST/mojo-env/bin/"
+PY_VER=""
 if [[ -x "$PIXI_ENV/bin/python3" ]]; then
+  PY_VER="$("$PIXI_ENV/bin/python3" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
   cp -a "$PIXI_ENV/bin/python3" "$DEST/mojo-env/bin/" || true
-  for py in python3.13 python; do
+  for py in "python${PY_VER}" python; do
     [[ -e "$PIXI_ENV/bin/$py" ]] && cp -a "$PIXI_ENV/bin/$py" "$DEST/mojo-env/bin/" || true
   done
 fi
@@ -83,13 +85,13 @@ for lib in \
   libMSupportGlobals.so libAsyncRTRuntimeGlobals.so libAsyncRTMojoBindings.so \
   libNVPTX.so libKGENCompilerRTShared.so libMGPRT.so \
   libstdc++.so.6 libgcc_s.so.1 \
-  libpython3.so libpython3.13.so libpython3.13.so.1.0
+  libpython3.so ${PY_VER:+"libpython${PY_VER}.so" "libpython${PY_VER}.so.1.0"}
 do
   [[ -e "$PIXI_ENV/lib/$lib" ]] && cp -a "$PIXI_ENV/lib/$lib" "$DEST/mojo-env/lib/" || true
 done
-if [[ -d "$PIXI_ENV/lib/python3.13" ]]; then
-  mkdir -p "$DEST/mojo-env/lib/python3.13"
-  cp -a "$PIXI_ENV/lib/python3.13/." "$DEST/mojo-env/lib/python3.13/"
+if [[ -n "$PY_VER" && -d "$PIXI_ENV/lib/python${PY_VER}" ]]; then
+  mkdir -p "$DEST/mojo-env/lib/python${PY_VER}"
+  cp -a "$PIXI_ENV/lib/python${PY_VER}/." "$DEST/mojo-env/lib/python${PY_VER}/"
 fi
 if [[ -f "$PIXI_ENV/share/max/modular.cfg" ]]; then
   sed -e "s|${PIXI_ENV}|__GOLIATH_ALIGN_HOME__/mojo-env|g" \
@@ -151,10 +153,13 @@ if [[ -x "${MOJO_BIN}" ]]; then
   fi
   export MODULAR_CACHE_DIR="${MODULAR_CACHE_DIR:-/tmp/modular_cache}"
   mkdir -p "${MODULAR_CACHE_DIR}" 2>/dev/null || true
-  if [[ -e "${ROOT}/mojo-env/lib/libpython3.13.so.1.0" ]]; then
-    export LD_PRELOAD="${ROOT}/mojo-env/lib/libpython3.13.so.1.0${LD_PRELOAD:+:$LD_PRELOAD}"
-    export PYTHONHOME="${ROOT}/mojo-env"
-  fi
+  for _libpy in "${ROOT}/mojo-env/lib"/libpython3.*.so.1.0; do
+    if [[ -e "${_libpy}" ]]; then
+      export LD_PRELOAD="${_libpy}${LD_PRELOAD:+:$LD_PRELOAD}"
+      export PYTHONHOME="${ROOT}/mojo-env"
+      break
+    fi
+  done
   cd "${ROOT}"
   exec "${MOJO_BIN}" src/main.mojo "$@"
 fi
