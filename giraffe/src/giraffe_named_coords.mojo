@@ -187,7 +187,7 @@ def named_coords_from_wrap(wrap: PythonObject) raises -> NamedCoordsMojo:
         idx.fd = Int(py=wrap["named_fd"])
         idx.n_nodes = Int(py=wrap["named_n_nodes"])
         idx.alive = True
-    except e:
+    except:
         pass
     return idx^
 

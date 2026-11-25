@@ -300,9 +300,9 @@ def map_fastq_stream_to_gaf(
 
     # Fail closed: never claim GPU Align while falling back to CuPy/host-nvidia.
     if (
-        backend.find("host-fallback") >= 0
-        or backend.find("host-nvidia") >= 0
-        or backend.find("cupy") >= 0
+        "host-fallback" in backend
+        or "host-nvidia" in backend
+        or "cupy" in backend
     ):
         var require = String(os_mod.environ.get("METHYLGRAPHER_GPU_REQUIRE", "")).lower()
         if (

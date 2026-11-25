@@ -22,7 +22,10 @@ def phred_to_int(qual_char: String) -> Int:
 
     Mirrors `phred_lookup_int` / `phred_to_int()` in python_reference/utility.py.
     """
-    return ord(qual_char) - 33
+    var bs = qual_char.as_bytes()
+    if len(bs) == 0:
+        return 0
+    return Int(bs[0]) - 33
 
 
 def reverse_complement(seq: String) -> String:

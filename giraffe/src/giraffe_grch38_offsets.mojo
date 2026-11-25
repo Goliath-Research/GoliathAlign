@@ -96,7 +96,12 @@ struct Grch38Offsets(Copyable, Movable):
                     line = trimmed
                 if line.byte_length() == 0:
                     continue
-                var tab = line.find("\t")
+                var line_bytes = line.as_bytes()
+                var tab = -1
+                for bi in range(len(line_bytes)):
+                    if line_bytes[bi] == UInt8(9):
+                        tab = bi
+                        break
                 if tab < 0:
                     self.chroms.append(line)
                     self.chrom_lens.append(0)

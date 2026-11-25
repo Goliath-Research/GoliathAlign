@@ -45,10 +45,10 @@ def main() raises:
     seqs.append(seq)
     var batch = minimizers_batch("cpu", seqs, k, w)
     print("batch_backend=", batch.backend, " n0=", len(batch.occs[0]))
-    if batch.backend.find("mojo_min") < 0:
+    if "mojo_min" not in batch.backend:
         print("FAIL: unexpected backend")
         exit(1)
-    if batch.backend.find("cupy") >= 0 or batch.backend.find("host-nvidia") >= 0:
+    if "cupy" in batch.backend or "host-nvidia" in batch.backend:
         print("FAIL: CuPy/host-nvidia path must not appear")
         exit(1)
     print("PASS")

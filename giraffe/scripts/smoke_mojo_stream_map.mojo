@@ -46,10 +46,10 @@ def main() raises:
     # Must not have gone through Python quartet_map banner
     var seed = String(os_mod.environ.get("METHYLGRAPHER_LAST_SEED_BACKEND", ""))
     print("seed_backend=", seed)
-    if seed.find("mojo_min_mmap") < 0:
+    if "mojo_min_mmap" not in seed:
         print("FAIL: expected mojo_min_mmap seed backend, got ", seed)
         exit(1)
-    if seed.find("host-nvidia-fallback") >= 0 or seed.find("cupy-") >= 0:
+    if "host-nvidia-fallback" in seed or "cupy-" in seed:
         print("FAIL: CuPy/host-nvidia-fallback must not be production seed backend")
         exit(1)
     print("PASS")

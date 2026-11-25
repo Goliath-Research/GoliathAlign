@@ -141,7 +141,12 @@ def _parse_mg_fastq_fields(n: String, s: String) -> StreamReadGPU:
             bare = String(n[byte = 0 : u0])
     elif u0 >= 0:
         bare = String(n[byte = 0 : u0])
-    var sp = bare.find(" ")
+    var bare_bytes = bare.as_bytes()
+    var sp = -1
+    for bi in range(len(bare_bytes)):
+        if bare_bytes[bi] == UInt8(32):
+            sp = bi
+            break
     if sp >= 0:
         var bare_head = String(bare[byte = 0 : sp])
         bare = bare_head

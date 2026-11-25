@@ -3235,7 +3235,7 @@ def map_fastq_fm_gpu(
         var t_sort = time_mod.perf_counter() * 0
         if emit_bam:
             var t_s0 = time_mod.perf_counter()
-            var t_g0s = time_mod.perf_counter()
+            var t_g0s: PythonObject
             var n_dups = 0
             if use_runs:
                 if n_reads > 0:

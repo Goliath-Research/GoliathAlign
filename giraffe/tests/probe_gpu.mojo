@@ -1,6 +1,5 @@
-from gpu.host import DeviceContext
-from gpu import thread_idx
-from sys import has_accelerator
+from max.gpu.host import DeviceContext
+from std.sys import has_accelerator
 
 def main() raises:
     print("has_accelerator=", has_accelerator())

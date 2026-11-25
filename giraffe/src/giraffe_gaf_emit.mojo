@@ -41,18 +41,19 @@ def _extras_have_prefix(extras: String, prefix: String) -> Bool:
         return False
     if extras.startswith(prefix):
         return True
-    return extras.find("\t" + prefix) >= 0
+    return ("\t" + prefix) in extras
 
 
 def _append_str(mut buf: List[UInt8], s: String):
-    var n = s.byte_length()
+    var bs = s.as_bytes()
+    var n = len(bs)
     if n <= 0:
         return
     var base = len(buf)
     buf.resize(base + n, UInt8(0))
     var i = 0
     while i < n:
-        buf[base + i] = UInt8(ord(s[byte = i : i + 1]))
+        buf[base + i] = bs[i]
         i += 1
 
 
@@ -223,7 +224,7 @@ def append_gaf_hits(fh: PythonObject, hits: List[AlignmentHit]) raises -> Int:
     try:
         _ = fh["gaf"]
         is_wrap = True
-    except e:
+    except:
         is_wrap = False
     if not is_wrap:
         if _emit_mode_sam():
@@ -274,7 +275,7 @@ def close_emit(fh: PythonObject) raises:
     try:
         _ = fh["gaf"]
         is_wrap = True
-    except e:
+    except:
         is_wrap = False
     if not is_wrap:
         fh.close()
@@ -283,7 +284,7 @@ def close_emit(fh: PythonObject) raises:
     var fd = Int(py=fh["fd"])
     try:
         _ = os_mod.fsync(fd)
-    except e:
+    except:
         pass
     _ = os_mod.close(fd)
     fh["fd"] = -1
